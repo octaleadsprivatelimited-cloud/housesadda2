@@ -4,6 +4,7 @@ import path from "path";
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  base: '/', // Explicit base path for deployment
   server: {
     host: "::",
     port: 8080,
@@ -26,6 +27,9 @@ export default defineConfig({
     },
     // Optimize chunk size
     chunkSizeWarningLimit: 1000,
+    // Ensure proper asset handling
+    assetsDir: 'assets',
+    sourcemap: false, // Disable sourcemaps in production for smaller bundle
   },
   optimizeDeps: {
     // Pre-bundle dependencies for faster dev server

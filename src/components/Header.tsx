@@ -24,15 +24,17 @@ export function Header() {
   });
 
   useEffect(() => {
-    // Fetch social media links
+    // Fetch social media links - fail silently if API is not available
     settingsAPI.getSocialMedia()
       .then((response) => {
-        if (response.success && response.data) {
+        if (response && response.success && response.data) {
           setSocialMedia(response.data);
         }
       })
       .catch((error) => {
-        console.error('Failed to load social media:', error);
+        // Silently fail - social media icons just won't show
+        // This prevents errors from breaking the header
+        console.debug('Social media links not available:', error.message);
       });
   }, []);
 

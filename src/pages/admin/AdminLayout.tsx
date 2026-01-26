@@ -9,7 +9,8 @@ import {
   Menu, 
   Settings,
   User,
-  X
+  X,
+  Loader2
 } from 'lucide-react';
 
 const menuItems = [
@@ -52,35 +53,49 @@ const AdminLayout = () => {
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [adminName, setAdminName] = useState('Sreekanth');
 
   useEffect(() => {
-    const session = localStorage.getItem('adminSession');
-    if (session) {
+    const checkAuth = () => {
       try {
-        const parsed = JSON.parse(session);
-        if (parsed.isLoggedIn && parsed.token) {
-          setIsAuthenticated(true);
-          if (parsed.user?.email || parsed.username) {
-            setAdminName(parsed.user?.email || parsed.username || 'Admin');
+        const session = localStorage.getItem('adminSession');
+        if (session) {
+          try {
+            const parsed = JSON.parse(session);
+            if (parsed.isLoggedIn && parsed.token) {
+              setIsAuthenticated(true);
+              if (parsed.user?.email || parsed.username) {
+                setAdminName(parsed.user?.email || parsed.username || 'Admin');
+              }
+              // If on /admin path, redirect to dashboard
+              if (location.pathname === '/admin' || location.pathname === '/admin/') {
+                navigate('/admin/dashboard', { replace: true });
+              }
+              setIsCheckingAuth(false);
+              return;
+            }
+          } catch (error) {
+            console.error('Error parsing session:', error);
+            localStorage.removeItem('adminSession');
           }
-          // If on /admin path, redirect to dashboard
-          if (location.pathname === '/admin') {
-            navigate('/admin/dashboard', { replace: true });
-          }
-        } else {
+        }
+        
+        // Not authenticated - redirect to login
+        setIsAuthenticated(false);
+        setIsCheckingAuth(false);
+        if (location.pathname !== '/admin' && location.pathname !== '/admin/') {
           navigate('/admin', { replace: true });
         }
       } catch (error) {
-        console.error('Error parsing session:', error);
+        console.error('Auth check error:', error);
+        setIsCheckingAuth(false);
+        setIsAuthenticated(false);
         navigate('/admin', { replace: true });
       }
-    } else {
-      // Only redirect if not already on login page
-      if (location.pathname !== '/admin') {
-        navigate('/admin', { replace: true });
-      }
-    }
+    };
+
+    checkAuth();
   }, [navigate, location.pathname]);
 
   const handleLogout = useCallback(() => {
@@ -99,8 +114,28 @@ const AdminLayout = () => {
   // Memoize active path check
   const activePath = useMemo(() => location.pathname, [location.pathname]);
 
+  // Show loading state while checking authentication
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If not authenticated, show redirect message
   if (!isAuthenticated) {
-    return null;
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-gray-600">Redirecting to login...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
