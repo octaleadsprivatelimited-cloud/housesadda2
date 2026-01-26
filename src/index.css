@@ -1,0 +1,384 @@
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Magicbricks-inspired Design System */
+    --background: 0 0% 100%;
+    --foreground: 0 0% 13%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 13%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 13%;
+
+    /* Primary - Magicbricks Red */
+    --primary: 355 85% 52%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary - Light Gray */
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 13%;
+
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
+
+    /* Accent - Red/Orange */
+    --accent: 355 85% 52%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 355 85% 52%;
+
+    --radius: 0.5rem;
+
+    /* Custom Tokens */
+    --price: 145 63% 32%;
+    --price-light: 145 40% 94%;
+    --verified: 210 100% 50%;
+    --verified-light: 210 100% 96%;
+    --featured: 40 100% 50%;
+    
+    /* Header */
+    --header-bg: 355 75% 42%;
+    
+    /* Shadows */
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.1);
+    --shadow-lg: 0 8px 30px rgba(0,0,0,0.12);
+    --shadow-card: 0 2px 8px rgba(0,0,0,0.08);
+    
+    /* Sidebar defaults */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 0 0% 13%;
+    --sidebar-primary: 355 85% 52%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 96%;
+    --sidebar-accent-foreground: 0 0% 13%;
+    --sidebar-border: 0 0% 90%;
+    --sidebar-ring: 355 85% 52%;
+  }
+
+  .dark {
+    --background: 0 0% 7%;
+    --foreground: 0 0% 95%;
+
+    --card: 0 0% 10%;
+    --card-foreground: 0 0% 95%;
+
+    --popover: 0 0% 10%;
+    --popover-foreground: 0 0% 95%;
+
+    --primary: 355 85% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 0% 15%;
+    --secondary-foreground: 0 0% 95%;
+
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 60%;
+
+    --accent: 355 85% 55%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 355 85% 55%;
+
+    --header-bg: 355 75% 38%;
+    
+    --sidebar-background: 0 0% 10%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 355 85% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 15%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 0 0% 20%;
+    --sidebar-ring: 355 85% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Open Sans', sans-serif;
+    /* Smooth scrolling performance */
+    scroll-behavior: smooth;
+    overflow-x: hidden;
+    /* GPU acceleration */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Open Sans', sans-serif;
+    @apply font-semibold;
+  }
+
+  /* Smooth scrolling for all scrollable elements */
+  * {
+    scroll-behavior: smooth;
+  }
+
+  /* Optimize scrolling performance */
+  [data-scroll-container] {
+    will-change: scroll-position;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@layer components {
+  /* Magicbricks Header Style */
+  .mb-header {
+    @apply bg-[hsl(var(--header-bg))] text-white;
+  }
+  
+  .mb-header-secondary {
+    @apply bg-white border-b border-border shadow-sm;
+  }
+  
+  /* Search Bar Magicbricks Style */
+  .mb-search-container {
+    @apply bg-white rounded-lg shadow-lg p-1 flex items-center;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  }
+  
+  .mb-search-input {
+    @apply border-0 focus:ring-0 focus:outline-none bg-transparent text-sm;
+  }
+  
+  .mb-search-divider {
+    @apply h-8 w-px bg-border mx-2;
+  }
+  
+  .mb-search-btn {
+    @apply bg-primary hover:bg-primary/90 text-white px-6 py-3 rounded-md font-semibold transition-colors;
+  }
+  
+  /* Tab Navigation */
+  .mb-tabs {
+    @apply flex items-center gap-1 bg-secondary rounded-lg p-1;
+  }
+  
+  .mb-tab {
+    @apply px-4 py-2 text-sm font-medium rounded-md transition-colors text-muted-foreground hover:text-foreground;
+  }
+  
+  .mb-tab-active {
+    @apply bg-white text-primary shadow-sm;
+  }
+  
+  /* Property Card Magicbricks Style */
+  .mb-property-card {
+    @apply bg-card border border-border rounded-lg overflow-hidden hover:shadow-lg transition-all duration-300;
+  }
+  
+  .mb-property-card:hover {
+    box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+  }
+  
+  .mb-property-image {
+    @apply relative overflow-hidden;
+  }
+  
+  .mb-property-image img {
+    @apply w-full h-full object-cover transition-transform duration-300;
+  }
+  
+  .mb-property-card:hover .mb-property-image img {
+    transform: scale(1.02);
+  }
+  
+  .mb-image-count {
+    @apply absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded flex items-center gap-1;
+  }
+  
+  /* Price Badge */
+  .mb-price {
+    @apply text-lg font-bold text-foreground;
+  }
+  
+  .mb-price-unit {
+    @apply text-sm font-normal text-muted-foreground ml-1;
+  }
+  
+  /* Property Specs */
+  .mb-specs {
+    @apply flex items-center gap-3 text-sm text-muted-foreground;
+  }
+  
+  .mb-spec-item {
+    @apply flex items-center gap-1;
+  }
+  
+  .mb-spec-divider {
+    @apply text-border;
+  }
+  
+  /* Featured Badge */
+  .mb-badge-featured {
+    @apply absolute top-2 left-2 bg-[hsl(var(--featured))] text-white text-xs font-bold px-2 py-1 rounded;
+  }
+  
+  .mb-badge-verified {
+    @apply inline-flex items-center gap-1 text-xs text-[hsl(var(--verified))] bg-[hsl(var(--verified-light))] px-2 py-0.5 rounded;
+  }
+  
+  /* Section Headers */
+  .mb-section-header {
+    @apply flex items-center justify-between mb-6;
+  }
+  
+  .mb-section-title {
+    @apply text-xl md:text-2xl font-bold text-foreground relative;
+  }
+  
+  .mb-section-title::after {
+    content: '';
+    @apply absolute -bottom-2 left-0 w-12 h-1 bg-primary rounded-full;
+  }
+  
+  /* Category Cards */
+  .mb-category-card {
+    @apply relative rounded-lg overflow-hidden cursor-pointer;
+  }
+  
+  .mb-category-card img {
+    @apply w-full h-full object-cover transition-transform duration-500;
+  }
+  
+  .mb-category-card:hover img {
+    transform: scale(1.1);
+  }
+  
+  .mb-category-overlay {
+    @apply absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent;
+  }
+  
+  .mb-category-content {
+    @apply absolute bottom-0 left-0 right-0 p-4 text-white;
+  }
+  
+  /* Buttons */
+  .mb-btn-primary {
+    @apply bg-primary hover:bg-primary/90 text-white font-semibold px-6 py-2.5 rounded transition-colors;
+  }
+  
+  .mb-btn-outline {
+    @apply border-2 border-primary text-primary hover:bg-primary hover:text-white font-semibold px-6 py-2.5 rounded transition-colors;
+  }
+  
+  .mb-btn-contact {
+    @apply bg-[hsl(var(--price))] hover:bg-[hsl(145_63%_28%)] text-white font-medium px-4 py-2 rounded transition-colors;
+  }
+  
+  /* WhatsApp Button */
+  .mb-whatsapp {
+    @apply bg-[#25D366] hover:bg-[#20BD5A] text-white font-medium transition-colors;
+  }
+  
+  /* Mobile Bottom Bar */
+  .mb-mobile-bar {
+    @apply fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-border p-3 flex gap-3 shadow-[0_-4px_20px_rgba(0,0,0,0.1)];
+  }
+  
+  /* Card Shadow */
+  .mb-shadow {
+    box-shadow: var(--shadow-card);
+  }
+  
+  .mb-shadow-hover:hover {
+    box-shadow: var(--shadow-lg);
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Smooth scrollbar styling */
+  .scrollbar-smooth::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .scrollbar-smooth::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-smooth::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    transition: background 0.2s ease;
+  }
+
+  .scrollbar-smooth::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+  }
+  
+  .line-clamp-1 {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Performance optimizations */
+  .gpu-accelerated {
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    will-change: transform;
+  }
+
+  .smooth-transition {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .smooth-transition-fast {
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Optimize rendering */
+  .optimize-rendering {
+    contain: layout style paint;
+    content-visibility: auto;
+  }
+}

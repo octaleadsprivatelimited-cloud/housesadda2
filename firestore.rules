@@ -1,0 +1,77 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to validate image size (max 15KB with margin)
+    function validateImageData(imageData) {
+      // Check if image_data exists and is a string
+      return imageData is string && 
+             imageData.size() <= 15360; // 15KB in bytes (15 * 1024)
+    }
+    
+    // Helper function to validate content size
+    function validateContent(content) {
+      return content is string && content.size() <= 10000; // Max 10KB for descriptions
+    }
+    
+    // Admin users collection - only server can write
+    match /admin_users/{userId} {
+      allow read: if false; // No client-side reads
+      allow write: if false; // Only server-side writes
+    }
+    
+    // Properties collection
+    match /properties/{propertyId} {
+      // Allow public reads for active properties
+      allow read: if resource.data.is_active == true || request.auth != null;
+      
+      // Only authenticated admin can write (handled by server, but rules as backup)
+      allow create: if false; // Server-side only
+      allow update: if false; // Server-side only
+      allow delete: if false; // Server-side only
+      
+      // Validate data structure
+      function isValidProperty() {
+        return request.resource.data.keys().hasAll(['title', 'price', 'city']) &&
+               request.resource.data.title is string &&
+               request.resource.data.title.size() > 0 &&
+               request.resource.data.title.size() <= 255 &&
+               request.resource.data.price is number &&
+               request.resource.data.price >= 0 &&
+               (!('description' in request.resource.data) || validateContent(request.resource.data.description));
+      }
+    }
+    
+    // Property images collection
+    match /property_images/{imageId} {
+      // Allow public reads
+      allow read: if true;
+      
+      // Only server can write (validation happens server-side)
+      allow create: if false; // Server-side only - validation enforced in backend
+      allow update: if false; // Server-side only
+      allow delete: if false; // Server-side only
+      
+      // Note: Image size validation is enforced server-side before writing
+      // Firestore rules cannot easily validate base64 string sizes
+      // Server-side validation ensures images are ≤ 15KB before storing
+    }
+    
+    // Property types collection
+    match /property_types/{typeId} {
+      allow read: if true;
+      allow write: if false; // Server-side only
+    }
+    
+    // Locations collection
+    match /locations/{locationId} {
+      allow read: if true;
+      allow write: if false; // Server-side only
+    }
+  }
+}

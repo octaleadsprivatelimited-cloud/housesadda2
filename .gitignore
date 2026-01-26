@@ -1,0 +1,49 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Environment variables
+.env
+.env.local
+.env.production
+
+# Database
+*.sql.backup
+*.db
+
+# Firebase
+serviceAccountKey.json
+*-firebase-adminsdk-*.json
+firebase-debug.log
+.firebase/
+
+# Local admin setup scripts
+database/create-admin.js
+server/setup-admin.js
+server/test-db.js
+server/test-db-query.js
+server/test-filter.js
+server/test-api-filter.js
+server/migrate-add-transaction-type.js
+server/update-rent-properties.js
