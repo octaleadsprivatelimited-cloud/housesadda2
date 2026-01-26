@@ -183,7 +183,47 @@ async function processImageUrl(imageUrl) {
   }
 }
 
-// Helper to format property with related data
+// Helper to format property with related data (optimized version using cached lookups)
+function formatPropertyOptimized(prop, locationMap, typeMap, imagesMap) {
+  const images = imagesMap[prop.id] || [];
+  const imageArray = Array.isArray(images) && images.length > 0 
+    ? images.filter(img => img && typeof img === 'string' && img.trim() !== '')
+    : [];
+  
+  // Get location and type data from cache
+  const location = prop.location_id ? locationMap[prop.location_id] : null;
+  const type = prop.type_id ? typeMap[prop.type_id] : null;
+  
+  const locationName = location?.name || '';
+  const city = location?.city || prop.city || 'Hyderabad';
+  const typeName = type?.name || '';
+
+  return {
+    id: prop.id,
+    title: prop.title,
+    type: typeName,
+    area: locationName,
+    city: city,
+    price: prop.price,
+    bedrooms: prop.bedrooms,
+    bathrooms: prop.bathrooms,
+    sqft: prop.sqft,
+    description: prop.description || '',
+    transactionType: prop.transaction_type || 'Sale',
+    image: imageArray[0] || null,
+    images: imageArray,
+    isFeatured: prop.is_featured === true,
+    isActive: prop.is_active !== false,
+    amenities: Array.isArray(prop.amenities) ? prop.amenities : (prop.amenities ? JSON.parse(prop.amenities) : []),
+    highlights: Array.isArray(prop.highlights) ? prop.highlights : (prop.highlights ? JSON.parse(prop.highlights) : []),
+    brochureUrl: prop.brochure_url || '',
+    mapUrl: prop.map_url || '',
+    videoUrl: prop.video_url || '',
+    createdAt: prop.created_at?.toDate?.() || prop.created_at
+  };
+}
+
+// Helper to format property with related data (original version for single property)
 async function formatProperty(propDoc) {
   const prop = { id: propDoc.id, ...propDoc.data() };
   const images = await getPropertyImages(prop.id);
@@ -213,12 +253,6 @@ async function formatProperty(propDoc) {
   const imageArray = Array.isArray(images) && images.length > 0 
     ? images.filter(img => img && typeof img === 'string' && img.trim() !== '')
     : [];
-  
-  console.log(`📦 Formatting property ${prop.id}:`, {
-    title: prop.title,
-    imagesCount: imageArray.length,
-    hasFirstImage: imageArray.length > 0
-  });
 
   return {
     id: prop.id,
@@ -233,7 +267,7 @@ async function formatProperty(propDoc) {
     description: prop.description || '',
     transactionType: prop.transaction_type || 'Sale',
     image: imageArray[0] || null,
-    images: imageArray, // Always return array, even if empty
+    images: imageArray,
     isFeatured: prop.is_featured === true,
     isActive: prop.is_active !== false,
     amenities: Array.isArray(prop.amenities) ? prop.amenities : (prop.amenities ? JSON.parse(prop.amenities) : []),
@@ -248,7 +282,7 @@ async function formatProperty(propDoc) {
 // Get all properties
 router.get('/', async (req, res) => {
   try {
-    const { search, type, city, area, featured, active, transactionType } = req.query;
+    const { search, type, city, area, featured, active, transactionType, limit, offset } = req.query;
     
     console.log('📥 GET /properties - Raw query:', req.query);
 
@@ -352,15 +386,127 @@ router.get('/', async (req, res) => {
 
     console.log(`📦 Found ${properties.length} properties from database`);
 
-    // Format properties
-    const formattedProperties = await Promise.all(properties.map(async (prop) => {
-      return await formatProperty({ id: prop.id, data: () => prop });
-    }));
+    // OPTIMIZATION: Batch fetch all related data upfront instead of per-property queries
+    // This reduces from N*3 queries to 3 queries total (where N = number of properties)
+    
+    // 1. Collect all unique location_ids and type_ids
+    const locationIds = [...new Set(properties.map(p => p.location_id).filter(Boolean))];
+    const typeIds = [...new Set(properties.map(p => p.type_id).filter(Boolean))];
+    const propertyIds = properties.map(p => p.id);
+    
+    console.log(`📊 Batch fetching: ${locationIds.length} locations, ${typeIds.length} types, ${propertyIds.length} properties`);
+    
+    // 2. Batch fetch all locations and types
+    const [locationsSnapshot, typesSnapshot] = await Promise.all([
+      locationIds.length > 0 
+        ? Promise.all(locationIds.map(id => db.collection('locations').doc(id).get()))
+        : Promise.resolve([]),
+      typeIds.length > 0
+        ? Promise.all(typeIds.map(id => db.collection('property_types').doc(id).get()))
+        : Promise.resolve([])
+    ]);
+    
+    // 3. Create lookup maps
+    const locationMap = {};
+    locationsSnapshot.forEach(doc => {
+      if (doc.exists) {
+        locationMap[doc.id] = doc.data();
+      }
+    });
+    
+    const typeMap = {};
+    typesSnapshot.forEach(doc => {
+      if (doc.exists) {
+        typeMap[doc.id] = doc.data();
+      }
+    });
+    
+    // 4. Batch fetch all images for all properties (limit to first image per property for list view)
+    const imagesMap = {};
+    if (propertyIds.length > 0) {
+      try {
+        // Fetch images in batches (Firestore 'in' query limit is 10)
+        const imageBatches = [];
+        for (let i = 0; i < propertyIds.length; i += 10) {
+          const batch = propertyIds.slice(i, i + 10);
+          imageBatches.push(
+            db.collection('property_images')
+              .where('property_id', 'in', batch)
+              .get()
+          );
+        }
+        
+        const imageSnapshots = await Promise.all(imageBatches);
+        
+        // Group images by property_id
+        imageSnapshots.forEach(snapshot => {
+          snapshot.docs.forEach(doc => {
+            const data = doc.data();
+            const propId = data.property_id;
+            if (!imagesMap[propId]) {
+              imagesMap[propId] = [];
+            }
+            const imageData = data.image_data || data.image_url || '';
+            if (imageData && imageData.trim() !== '') {
+              imagesMap[propId].push({
+                data: imageData,
+                order: data.display_order || 0
+              });
+            }
+          });
+        });
+        
+        // Sort images by display_order for each property
+        Object.keys(imagesMap).forEach(propId => {
+          imagesMap[propId].sort((a, b) => a.order - b.order);
+          imagesMap[propId] = imagesMap[propId].map(img => img.data);
+        });
+        
+        console.log(`✅ Loaded images for ${Object.keys(imagesMap).length} properties`);
+      } catch (imageError) {
+        console.warn('⚠️ Error batch fetching images:', imageError.message);
+        // Continue without images - they'll just be empty
+      }
+    }
+    
+    // 5. Format properties using cached data (no additional queries!)
+    const formattedProperties = properties.map(prop => 
+      formatPropertyOptimized(prop, locationMap, typeMap, imagesMap)
+    );
 
-    res.json(formattedProperties);
+    // 6. Apply pagination if requested
+    const limitNum = limit ? parseInt(limit) : null;
+    const offsetNum = offset ? parseInt(offset) : 0;
+    let paginatedProperties = formattedProperties;
+    
+    if (limitNum) {
+      paginatedProperties = formattedProperties.slice(offsetNum, offsetNum + limitNum);
+    } else if (formattedProperties.length > 100) {
+      // Default limit of 100 if no limit specified and we have many properties
+      console.log(`⚠️ Limiting to first 100 properties (total: ${formattedProperties.length})`);
+      paginatedProperties = formattedProperties.slice(0, 100);
+    }
+
+    console.log(`✅ Formatted ${paginatedProperties.length} properties (optimized, total available: ${formattedProperties.length})`);
+    
+    res.json(paginatedProperties);
   } catch (error) {
     console.error('Get properties error:', error);
-    res.status(500).json({ error: 'Internal server error', message: error.message });
+    
+    // Handle timeout specifically
+    if (error.message.includes('timeout')) {
+      return res.status(504).json({ 
+        error: 'Request timeout', 
+        message: 'Too many properties to process. Please use pagination with ?limit=50',
+        suggestion: 'Add ?limit=50&offset=0 to your request'
+      });
+    }
+    
+    res.status(500).json({ 
+      error: 'Internal server error', 
+      message: error.message,
+      ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
+    });
   }
 });
 
