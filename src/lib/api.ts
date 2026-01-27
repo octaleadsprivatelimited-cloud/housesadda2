@@ -6,38 +6,33 @@ const getApiBaseUrl = () => {
   }
   
   // Check if we're in production (not localhost)
-  const isProduction = window.location.hostname !== 'localhost' && 
-                       window.location.hostname !== '127.0.0.1' &&
-                       !window.location.hostname.startsWith('192.168.');
-  
-  // In production, use relative URL to avoid localhost issues
-  // This assumes the API is on the same domain or proxied via Vercel
-  if (isProduction) {
-    if (import.meta.env.DEV) {
-      console.log('🌐 Using relative API URL for production');
+  if (typeof window !== 'undefined') {
+    const isProduction = window.location.hostname !== 'localhost' && 
+                         window.location.hostname !== '127.0.0.1' &&
+                         !window.location.hostname.startsWith('192.168.');
+    
+    // In production, use relative URL
+    if (isProduction) {
+      return '/api';
     }
-    return '/api';
   }
   
   // In development, use localhost
-  if (import.meta.env.DEV) {
-    console.log('🌐 Using localhost API URL for development');
-  }
   return 'http://localhost:3001/api';
 };
 
 const API_BASE_URL = getApiBaseUrl();
-// Only log in development
-if (import.meta.env.DEV) {
-  console.log('🔗 API Base URL:', API_BASE_URL);
-}
 
 // Helper function to get auth token
 const getAuthToken = (): string | null => {
-  const session = localStorage.getItem('adminSession');
-  if (session) {
-    const parsed = JSON.parse(session);
-    return parsed.token || null;
+  try {
+    const session = localStorage.getItem('adminSession');
+    if (session) {
+      const parsed = JSON.parse(session);
+      return parsed.token || null;
+    }
+  } catch (error) {
+    // Ignore parse errors
   }
   return null;
 };
@@ -56,7 +51,7 @@ const getCachedResponse = (key: string) => {
     return cached.data;
   }
   if (cached) {
-    requestCache.delete(key); // Remove expired cache
+    requestCache.delete(key);
   }
   return null;
 };
@@ -70,9 +65,6 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}, timeout: 
   if (cacheKey) {
     const cached = getCachedResponse(cacheKey);
     if (cached) {
-      if (import.meta.env.DEV) {
-        console.log('📦 Using cached response for:', endpoint);
-      }
       return cached;
     }
   }
@@ -88,17 +80,6 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}, timeout: 
   }
 
   try {
-    // Only log in development
-    if (import.meta.env.DEV) {
-      console.log('🌐 API Request:', {
-        url: `${API_BASE_URL}${endpoint}`,
-        method: options.method || 'GET',
-        headers: Object.keys(headers),
-        hasBody: !!options.body,
-      });
-    }
-
-    // Create abort controller for timeout
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
@@ -110,17 +91,6 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}, timeout: 
 
     clearTimeout(timeoutId);
 
-    // Only log in development
-    if (import.meta.env.DEV) {
-      console.log('📥 API Response:', {
-        status: response.status,
-        statusText: response.statusText,
-        contentType: response.headers.get('content-type'),
-        ok: response.ok
-      });
-    }
-
-    // Handle non-JSON responses
     let data;
     const contentType = response.headers.get('content-type');
     
@@ -132,7 +102,6 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}, timeout: 
         data = { error: text || 'Request failed', message: text || 'Request failed' };
       }
     } catch (parseError) {
-      console.error('❌ Failed to parse response:', parseError);
       data = { 
         error: `Failed to parse response (${response.status})`, 
         message: `Server returned status ${response.status}` 
@@ -140,15 +109,6 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}, timeout: 
     }
 
     if (!response.ok) {
-      // Log the error for debugging
-      console.error('❌ API Error Response:', {
-        status: response.status,
-        statusText: response.statusText,
-        data: data,
-        url: `${API_BASE_URL}${endpoint}`
-      });
-
-      // Create error object with detailed message
       const errorMessage = data.error || data.message || `Request failed with status ${response.status}`;
       const error = new Error(errorMessage);
       (error as any).error = errorMessage;
@@ -164,7 +124,7 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}, timeout: 
         data,
         timestamp: Date.now()
       });
-      // Limit cache size to prevent memory issues
+      // Limit cache size
       if (requestCache.size > 50) {
         const firstKey = requestCache.keys().next().value;
         requestCache.delete(firstKey);
@@ -173,38 +133,33 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}, timeout: 
 
     return data;
   } catch (error: any) {
-    // Handle timeout/abort errors
     if (error.name === 'AbortError') {
-      const timeoutError = new Error('Request timeout. The server took too long to respond.');
+      const timeoutError = new Error(`Request timed out after ${timeout / 1000} seconds. Please try again.`);
       (timeoutError as any).error = timeoutError.message;
       (timeoutError as any).status = 408;
       throw timeoutError;
     }
     
-    // If it's already our custom error, re-throw it
     if (error.error || error.message) {
       throw error;
     }
     
-    // Handle network errors
-    if (error.name === 'TypeError' && (error.message.includes('fetch') || error.message.includes('Failed to fetch'))) {
-      const networkError = new Error('Cannot connect to server. Make sure the backend is running on port 3001');
+    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      const networkError = new Error('Cannot connect to server. Make sure the backend is running.');
       (networkError as any).error = networkError.message;
-      (networkError as any).status = 0;
+      (networkError as any).status = 503;
       throw networkError;
     }
     
-    // Otherwise, create a user-friendly error
     const friendlyError = new Error(error.message || 'Network error. Please check your connection.');
     (friendlyError as any).error = friendlyError.message;
-    (friendlyError as any).status = error.status || 500;
+    (friendlyError as any).status = 500;
     throw friendlyError;
   }
 };
 
 // Auth API
 export const authAPI = {
-  // Legacy login (username/password) - kept for backward compatibility
   login: async (username: string, password: string) => {
     const response = await apiRequest('/auth/login', {
       method: 'POST',
@@ -213,7 +168,6 @@ export const authAPI = {
     return response;
   },
 
-  // Firebase Auth login (recommended)
   loginWithFirebase: async (idToken: string) => {
     if (!idToken || typeof idToken !== 'string' || idToken.length === 0) {
       throw new Error('Invalid authentication token');
@@ -221,24 +175,10 @@ export const authAPI = {
     
     const requestBody = { idToken };
     
-    console.log('📤 API: Preparing login request:', {
-      hasIdToken: !!idToken,
-      idTokenLength: idToken.length,
-      requestBodyKeys: Object.keys(requestBody),
-      endpoint: '/auth/login',
-      apiBaseUrl: API_BASE_URL
-    });
-    
     try {
       const response = await apiRequest('/auth/login', {
         method: 'POST',
         body: JSON.stringify(requestBody),
-      });
-      
-      console.log('✅ API: Login response received:', {
-        success: response?.success,
-        hasToken: !!response?.token,
-        hasUser: !!response?.user
       });
       
       if (!response || !response.success) {
@@ -247,13 +187,6 @@ export const authAPI = {
       
       return response;
     } catch (error: any) {
-      console.error('❌ API: Login error:', {
-        message: error.message,
-        error: error.error,
-        status: error.status
-      });
-      
-      // Re-throw with better error message
       if (error.message) {
         throw error;
       }
@@ -301,22 +234,17 @@ export const propertiesAPI = {
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
         if (value !== undefined && value !== null) {
-          // Convert boolean to string 'true' or 'false'
           const stringValue = typeof value === 'boolean' ? String(value) : String(value);
           queryParams.append(key, stringValue);
         }
       });
     }
-    // Only add default limit if not specified AND not in admin context
-    // Admin panel should explicitly pass limit
     if (!params?.limit) {
       queryParams.append('limit', '20');
     }
     const query = queryParams.toString();
     const url = `/properties${query ? `?${query}` : ''}`;
-    console.log('🌐 API Call:', url);
     const response = await apiRequest(url);
-    // Return response as-is (could be array or object with properties array)
     return response;
   },
 
@@ -434,4 +362,3 @@ export const settingsAPI = {
     });
   },
 };
-

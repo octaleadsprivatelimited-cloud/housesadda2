@@ -6,8 +6,6 @@ import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 // Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-// Configuration loaded from environment variables (.env file) with fallback values
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyCyFGUxTk4ku6bXbnxodxBrwEKuQZb9BlQ",
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "housesadda-6818b.firebaseapp.com",
@@ -19,18 +17,21 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
+let app;
+try {
+  app = initializeApp(firebaseConfig);
+} catch (error) {
+  console.error("Firebase initialization error:", error);
+  throw error;
+}
 
-// Initialize Analytics (only in browser)
-// Gracefully handle analytics initialization failures (e.g., ad blockers)
-let analytics;
+// Initialize Analytics (only in browser, fail silently)
+let analytics = null;
 if (typeof window !== 'undefined') {
   try {
     analytics = getAnalytics(app);
   } catch (analyticsError) {
-    // Analytics initialization failed (likely blocked by ad blocker or privacy extension)
-    // This is not critical - the app will work fine without analytics
-    console.warn('⚠️ Google Analytics initialization failed (likely blocked by browser extension):', analyticsError);
+    // Analytics initialization failed - not critical
     analytics = null;
   }
 }
