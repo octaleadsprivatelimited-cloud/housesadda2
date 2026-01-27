@@ -13,8 +13,69 @@ function getDatabase() {
   return getDb();
 }
 
-// Format property with related data
-async function formatProperty(prop, db) {
+// Generate property ID based on transaction type: R#001 for Rent, B#001 for Buy/Sale
+async function getNextPropertyId(transactionType, db) {
+  const isRent = transactionType === 'Rent' || transactionType === 'PG';
+  const prefix = isRent ? 'R' : 'B';
+  const counterDocId = isRent ? 'property_id_rent' : 'property_id_buy';
+  
+  const counterRef = db.collection('counters').doc(counterDocId);
+  
+  const newId = await db.runTransaction(async (transaction) => {
+    const counterDoc = await transaction.get(counterRef);
+    let currentCount = 0;
+    
+    if (counterDoc.exists) {
+      currentCount = counterDoc.data().count || 0;
+    }
+    
+    currentCount++;
+    transaction.set(counterRef, {
+      count: currentCount,
+      updated_at: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+    
+    // Generate ID in format R#001, R#002, B#001, B#002, etc.
+    const formattedId = `${prefix}#${String(currentCount).padStart(3, '0')}`;
+    return formattedId;
+  });
+  
+  console.log(`✅ Generated property ID: ${newId}`);
+  return newId;
+}
+
+// Optimized format property for list view (no images)
+function formatPropertyList(prop, locationMap, typeMap) {
+  const location = locationMap[prop.location_id];
+  const type = typeMap[prop.type_id];
+  
+  return {
+    id: prop.id,
+    title: prop.title || '',
+    type: type?.name || '',
+    area: location?.name || '',
+    city: location?.city || prop.city || 'Hyderabad',
+    price: prop.price || 0,
+    bedrooms: prop.bedrooms || 0,
+    bathrooms: prop.bathrooms || 0,
+    sqft: prop.sqft || 0,
+    description: prop.description || '',
+    transactionType: prop.transaction_type || 'Sale',
+    image: null, // No image for list view (loaded separately)
+    images: [],
+    isFeatured: prop.is_featured === true,
+    isActive: prop.is_active !== false,
+    amenities: Array.isArray(prop.amenities) ? prop.amenities : [],
+    highlights: Array.isArray(prop.highlights) ? prop.highlights : [],
+    brochureUrl: prop.brochure_url || '',
+    mapUrl: prop.map_url || '',
+    videoUrl: prop.video_url || '',
+    createdAt: prop.created_at?.toDate?.() || prop.created_at
+  };
+}
+
+// Format property with related data (full version with images)
+async function formatProperty(prop, db, skipImages = false) {
   try {
     // Get location and type in parallel
     const [locationDoc, typeDoc] = await Promise.all([
@@ -25,26 +86,44 @@ async function formatProperty(prop, db) {
     const location = locationDoc?.exists ? locationDoc.data() : null;
     const type = typeDoc?.exists ? typeDoc.data() : null;
 
-    // Get images (try with orderBy, fallback without)
-    let imagesSnapshot;
-    try {
-      imagesSnapshot = await db.collection('property_images')
-        .where('property_id', '==', prop.id)
-        .orderBy('display_order', 'asc')
-        .get();
-    } catch (error) {
-      // If orderBy fails (missing index), fetch without orderBy
-      imagesSnapshot = await db.collection('property_images')
-        .where('property_id', '==', prop.id)
-        .get();
+    // Get images only if not skipped
+    let images = [];
+    if (!skipImages) {
+      try {
+        const imagesSnapshot = await db.collection('property_images')
+          .where('property_id', '==', prop.id)
+          .orderBy('display_order', 'asc')
+          .get();
+        
+        images = imagesSnapshot.docs
+          .map(doc => {
+            const data = doc.data();
+            return data.image_data || data.image_url || '';
+          })
+          .filter(img => img && img.trim() !== '');
+      } catch (error) {
+        // If orderBy fails, fetch without orderBy
+        try {
+          const imagesSnapshot = await db.collection('property_images')
+            .where('property_id', '==', prop.id)
+            .get();
+          
+          images = imagesSnapshot.docs
+            .map(doc => {
+              const data = doc.data();
+              return data.image_data || data.image_url || '';
+            })
+            .filter(img => img && img.trim() !== '')
+            .sort((a, b) => {
+              const orderA = imagesSnapshot.docs.find(d => (d.data().image_data || d.data().image_url) === a)?.data().display_order || 999;
+              const orderB = imagesSnapshot.docs.find(d => (d.data().image_data || d.data().image_url) === b)?.data().display_order || 999;
+              return orderA - orderB;
+            });
+        } catch (err) {
+          console.warn(`Could not fetch images for property ${prop.id}`);
+        }
+      }
     }
-    
-    const images = imagesSnapshot.docs
-      .map(doc => {
-        const data = doc.data();
-        return data.image_data || data.image_url || '';
-      })
-      .filter(img => img && img.trim() !== '');
 
     return {
       id: prop.id,
@@ -98,11 +177,15 @@ async function formatProperty(prop, db) {
   }
 }
 
-// Get all properties
+// Get all properties (OPTIMIZED for fast loading)
 router.get('/', async (req, res) => {
   try {
     const db = getDatabase();
-    const { search, type, city, area, featured, active, transactionType, limit = 50, offset = 0, skipImages } = req.query;
+    const { search, type, city, area, featured, active, transactionType, limit = 20, offset = 0, skipImages } = req.query;
+
+    const shouldSkipImages = skipImages === 'true' || skipImages === true;
+    const limitNum = Math.min(parseInt(limit) || 20, 100); // Max 100 per request
+    const offsetNum = parseInt(offset) || 0;
 
     let query = db.collection('properties');
 
@@ -132,10 +215,8 @@ router.get('/', async (req, res) => {
     if (featured !== undefined) query = query.where('is_featured', '==', featured === 'true');
     if (transactionType) query = query.where('transaction_type', '==', transactionType);
 
-    // Order and limit
+    // Order and limit at Firestore level for better performance
     query = query.orderBy('created_at', 'desc');
-    const limitNum = parseInt(limit);
-    const offsetNum = parseInt(offset);
     query = query.limit(limitNum + offsetNum);
 
     const snapshot = await query.get();
@@ -162,17 +243,72 @@ router.get('/', async (req, res) => {
     // Apply pagination
     const paginatedProperties = properties.slice(offsetNum, offsetNum + limitNum);
 
-    // Format properties (with error handling)
-    const formattedProperties = [];
-    for (const prop of paginatedProperties) {
-      try {
-        const formatted = await formatProperty(prop, db);
-        formattedProperties.push(formatted);
-      } catch (error) {
-        console.error(`Error formatting property ${prop.id}:`, error);
-        // Skip this property if formatting fails
+    // OPTIMIZATION: Batch fetch all locations and types upfront
+    const locationIds = [...new Set(paginatedProperties.map(p => p.location_id).filter(Boolean))];
+    const typeIds = [...new Set(paginatedProperties.map(p => p.type_id).filter(Boolean))];
+
+    const [locationDocs, typeDocs] = await Promise.all([
+      locationIds.length > 0 
+        ? Promise.all(locationIds.map(id => db.collection('locations').doc(id).get()))
+        : Promise.resolve([]),
+      typeIds.length > 0
+        ? Promise.all(typeIds.map(id => db.collection('property_types').doc(id).get()))
+        : Promise.resolve([])
+    ]);
+
+    const locationMap = {};
+    locationDocs.forEach(doc => {
+      if (doc.exists) locationMap[doc.id] = doc.data();
+    });
+
+    const typeMap = {};
+    typeDocs.forEach(doc => {
+      if (doc.exists) typeMap[doc.id] = doc.data();
+    });
+
+    // OPTIMIZATION: Batch fetch first image for each property (only if not skipping)
+    const imagesMap = {};
+    if (!shouldSkipImages && paginatedProperties.length > 0) {
+      const propertyIds = paginatedProperties.map(p => p.id);
+      
+      // Fetch in batches of 10 (Firestore 'in' query limit)
+      for (let i = 0; i < propertyIds.length; i += 10) {
+        const batch = propertyIds.slice(i, i + 10);
+        try {
+          const imagesSnapshot = await db.collection('property_images')
+            .where('property_id', 'in', batch)
+            .get();
+          
+          imagesSnapshot.docs.forEach(doc => {
+            const data = doc.data();
+            const propId = data.property_id;
+            if (!imagesMap[propId]) {
+              imagesMap[propId] = [];
+            }
+            // Only add first image for list view
+            if (imagesMap[propId].length === 0) {
+              const imageData = data.image_data || data.image_url || '';
+              if (imageData && imageData.trim() !== '') {
+                imagesMap[propId].push(imageData);
+              }
+            }
+          });
+        } catch (error) {
+          console.warn(`Error fetching images for batch:`, error.message);
+        }
       }
     }
+
+    // Format properties using cached data (FAST!)
+    const formattedProperties = paginatedProperties.map(prop => {
+      const formatted = formatPropertyList(prop, locationMap, typeMap);
+      // Add first image if available
+      if (imagesMap[prop.id] && imagesMap[prop.id].length > 0) {
+        formatted.image = imagesMap[prop.id][0];
+        formatted.images = imagesMap[prop.id];
+      }
+      return formatted;
+    });
 
     res.json({
       properties: formattedProperties,
@@ -198,7 +334,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get single property
+// Get single property (with all images)
 router.get('/:id', async (req, res) => {
   try {
     const db = getDatabase();
@@ -210,7 +346,7 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Property not found' });
     }
 
-    const property = await formatProperty({ id: doc.id, ...doc.data() }, db);
+    const property = await formatProperty({ id: doc.id, ...doc.data() }, db, false);
     res.json(property);
   } catch (error) {
     console.error('Get property error:', error);
@@ -218,7 +354,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Create property (protected)
+// Create property (protected) - with new ID format
 router.post('/', authenticateToken, async (req, res) => {
   try {
     const db = getDatabase();
@@ -250,9 +386,13 @@ router.post('/', authenticateToken, async (req, res) => {
 
     const locationId = locationSnapshot.docs[0].id;
     const typeId = typeSnapshot.docs[0].id;
+    const finalTransactionType = transactionType || 'Sale';
 
-    // Create property
-    const propertyRef = await db.collection('properties').add({
+    // Generate property ID: R#001 for Rent, B#001 for Buy/Sale
+    const propertyId = await getNextPropertyId(finalTransactionType, db);
+
+    // Create property with custom ID
+    await db.collection('properties').doc(propertyId).set({
       title,
       location_id: locationId,
       type_id: typeId,
@@ -262,7 +402,7 @@ router.post('/', authenticateToken, async (req, res) => {
       bathrooms: parseInt(bathrooms) || 0,
       sqft: parseInt(sqft) || 0,
       description: description || '',
-      transaction_type: transactionType || 'Sale',
+      transaction_type: finalTransactionType,
       is_featured: isFeatured === true,
       is_active: isActive !== false,
       amenities: amenities || [],
@@ -280,7 +420,7 @@ router.post('/', authenticateToken, async (req, res) => {
       images.forEach((imageData, index) => {
         const imageRef = db.collection('property_images').doc();
         batch.set(imageRef, {
-          property_id: propertyRef.id,
+          property_id: propertyId,
           image_data: imageData,
           display_order: index,
           created_at: admin.firestore.FieldValue.serverTimestamp()
@@ -289,7 +429,7 @@ router.post('/', authenticateToken, async (req, res) => {
       await batch.commit();
     }
 
-    res.json({ success: true, id: propertyRef.id });
+    res.json({ success: true, id: propertyId });
   } catch (error) {
     console.error('Create property error:', error);
     res.status(500).json({ error: 'Internal server error', message: error.message });

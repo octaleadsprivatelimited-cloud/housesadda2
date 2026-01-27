@@ -331,8 +331,34 @@ async function addDemoProperties() {
           continue;
         }
 
-        // Create property
-        const propertyRef = await db.collection('properties').add({
+        // Generate property ID based on transaction type: R#001 for Rent, B#001 for Buy/Sale
+        const isRent = prop.transactionType === 'Rent' || prop.transactionType === 'PG';
+        const prefix = isRent ? 'R' : 'B';
+        const counterDocId = isRent ? 'property_id_rent' : 'property_id_buy';
+        
+        const counterRef = db.collection('counters').doc(counterDocId);
+        let propertyId;
+        
+        await db.runTransaction(async (transaction) => {
+          const counterDoc = await transaction.get(counterRef);
+          let currentCount = 0;
+          
+          if (counterDoc.exists) {
+            currentCount = counterDoc.data().count || 0;
+          }
+          
+          currentCount++;
+          transaction.set(counterRef, {
+            count: currentCount,
+            updated_at: admin.firestore.FieldValue.serverTimestamp()
+          }, { merge: true });
+          
+          // Generate ID in format R#001, R#002, B#001, B#002, etc.
+          propertyId = `${prefix}#${String(currentCount).padStart(3, '0')}`;
+        });
+
+        // Create property with custom ID
+        await db.collection('properties').doc(propertyId).set({
           title: prop.title,
           location_id: locationId,
           type_id: typeId,
@@ -356,13 +382,13 @@ async function addDemoProperties() {
 
         // Add sample image
         await db.collection('property_images').add({
-          property_id: propertyRef.id,
+          property_id: propertyId,
           image_data: sampleImage,
           display_order: 0,
           created_at: admin.firestore.FieldValue.serverTimestamp()
         });
 
-        console.log(`✅ Added: ${prop.title} (ID: ${propertyRef.id})`);
+        console.log(`✅ Added: ${prop.title} (ID: ${propertyId})`);
         added++;
 
       } catch (error) {

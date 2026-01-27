@@ -102,7 +102,7 @@ const Properties = () => {
       
       console.log('🔍 Loading properties with params:', params);
       // Add limit for performance (20 properties per page)
-      const response = await propertiesAPI.getAll({ ...params, limit: 20 });
+      const response = await propertiesAPI.getAll({ ...params, limit: 20, skipImages: false });
       
       // Handle both old format (array) and new format (object with pagination)
       const data = Array.isArray(response) ? response : (response.properties || response || []);
