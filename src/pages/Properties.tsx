@@ -101,7 +101,11 @@ const Properties = () => {
       }
       
       console.log('🔍 Loading properties with params:', params);
-      const data = await propertiesAPI.getAll(params);
+      // Add limit for performance (20 properties per page)
+      const response = await propertiesAPI.getAll({ ...params, limit: 20 });
+      
+      // Handle both old format (array) and new format (object with pagination)
+      const data = Array.isArray(response) ? response : (response.properties || response || []);
       
       // Transform API data to Property format
       const transformedProperties: Property[] = data.map((prop: any) => ({
@@ -140,13 +144,24 @@ const Properties = () => {
 
   const loadLocationsAndTypes = async () => {
     try {
+      // OPTIMIZED: Use locations API directly instead of fetching all properties
       const [locationsData, typesData] = await Promise.all([
-        propertiesAPI.getAll({ active: true }).then(props => {
+        import('@/lib/api').then(m => m.locationsAPI.getAll()).then(locations => {
           const uniqueAreas = new Set<string>(['All Areas']);
-          props.forEach((p: any) => {
-            if (p.area) uniqueAreas.add(p.area);
+          locations.forEach((loc: any) => {
+            if (loc.name) uniqueAreas.add(loc.name);
           });
           return Array.from(uniqueAreas);
+        }).catch(() => {
+          // Fallback: use properties API with limit
+          return propertiesAPI.getAll({ active: true, limit: 50 }).then(props => {
+            const data = Array.isArray(props) ? props : (props.properties || props);
+            const uniqueAreas = new Set<string>(['All Areas']);
+            data.forEach((p: any) => {
+              if (p.area) uniqueAreas.add(p.area);
+            });
+            return Array.from(uniqueAreas);
+          });
         }),
         import('@/lib/api').then(m => m.typesAPI.getAll()).then(types => {
           return ['All Types', ...types.map((t: any) => t.name)];

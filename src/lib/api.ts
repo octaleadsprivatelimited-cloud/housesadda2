@@ -218,6 +218,8 @@ export const propertiesAPI = {
     featured?: boolean;
     active?: boolean;
     transactionType?: string;
+    limit?: number;
+    offset?: number;
   }) => {
     const queryParams = new URLSearchParams();
     if (params) {
@@ -228,6 +230,10 @@ export const propertiesAPI = {
           queryParams.append(key, stringValue);
         }
       });
+    }
+    // Add default limit if not specified (for performance)
+    if (!params?.limit) {
+      queryParams.append('limit', '20');
     }
     const query = queryParams.toString();
     const url = `/properties${query ? `?${query}` : ''}`;

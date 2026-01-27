@@ -386,13 +386,23 @@ router.get('/', async (req, res) => {
 
     console.log(`📦 Found ${properties.length} properties from database`);
 
+    // CRITICAL OPTIMIZATION: Apply pagination BEFORE fetching images to reduce load
+    // Default limit: 20 properties for initial load (much faster)
+    const defaultLimit = 20;
+    const limitNum = limit ? parseInt(limit) : defaultLimit;
+    const offsetNum = offset ? parseInt(offset) : 0;
+    
+    // Slice properties BEFORE fetching images (huge performance gain)
+    const paginatedProperties = properties.slice(offsetNum, offsetNum + limitNum);
+    console.log(`📊 Paginating: Showing ${paginatedProperties.length} of ${properties.length} properties (limit: ${limitNum}, offset: ${offsetNum})`);
+
     // OPTIMIZATION: Batch fetch all related data upfront instead of per-property queries
     // This reduces from N*3 queries to 3 queries total (where N = number of properties)
     
-    // 1. Collect all unique location_ids and type_ids
-    const locationIds = [...new Set(properties.map(p => p.location_id).filter(Boolean))];
-    const typeIds = [...new Set(properties.map(p => p.type_id).filter(Boolean))];
-    const propertyIds = properties.map(p => p.id);
+    // 1. Collect all unique location_ids and type_ids (only for paginated properties)
+    const locationIds = [...new Set(paginatedProperties.map(p => p.location_id).filter(Boolean))];
+    const typeIds = [...new Set(paginatedProperties.map(p => p.type_id).filter(Boolean))];
+    const propertyIds = paginatedProperties.map(p => p.id);
     
     console.log(`📊 Batch fetching: ${locationIds.length} locations, ${typeIds.length} types, ${propertyIds.length} properties`);
     
@@ -421,7 +431,7 @@ router.get('/', async (req, res) => {
       }
     });
     
-    // 4. Batch fetch all images for all properties (limit to first image per property for list view)
+    // 4. OPTIMIZED: Fetch ONLY FIRST image per property for list view (much faster!)
     const imagesMap = {};
     if (propertyIds.length > 0) {
       try {
@@ -438,31 +448,44 @@ router.get('/', async (req, res) => {
         
         const imageSnapshots = await Promise.all(imageBatches);
         
-        // Group images by property_id
+        // Group images by property_id and only keep FIRST image per property
         imageSnapshots.forEach(snapshot => {
           snapshot.docs.forEach(doc => {
             const data = doc.data();
             const propId = data.property_id;
+            
+            // Only store first image (by display_order)
             if (!imagesMap[propId]) {
-              imagesMap[propId] = [];
-            }
-            const imageData = data.image_data || data.image_url || '';
-            if (imageData && imageData.trim() !== '') {
-              imagesMap[propId].push({
-                data: imageData,
-                order: data.display_order || 0
-              });
+              const imageData = data.image_data || data.image_url || '';
+              if (imageData && imageData.trim() !== '') {
+                imagesMap[propId] = {
+                  data: imageData,
+                  order: data.display_order || 0
+                };
+              }
+            } else {
+              // Keep image with lowest display_order (first image)
+              const currentOrder = imagesMap[propId].order || 999;
+              const newOrder = data.display_order || 999;
+              if (newOrder < currentOrder) {
+                const imageData = data.image_data || data.image_url || '';
+                if (imageData && imageData.trim() !== '') {
+                  imagesMap[propId] = {
+                    data: imageData,
+                    order: newOrder
+                  };
+                }
+              }
             }
           });
         });
         
-        // Sort images by display_order for each property
+        // Convert to array format (only first image)
         Object.keys(imagesMap).forEach(propId => {
-          imagesMap[propId].sort((a, b) => a.order - b.order);
-          imagesMap[propId] = imagesMap[propId].map(img => img.data);
+          imagesMap[propId] = [imagesMap[propId].data];
         });
         
-        console.log(`✅ Loaded images for ${Object.keys(imagesMap).length} properties`);
+        console.log(`✅ Loaded first image for ${Object.keys(imagesMap).length} properties (optimized)`);
       } catch (imageError) {
         console.warn('⚠️ Error batch fetching images:', imageError.message);
         // Continue without images - they'll just be empty
@@ -470,26 +493,22 @@ router.get('/', async (req, res) => {
     }
     
     // 5. Format properties using cached data (no additional queries!)
-    const formattedProperties = properties.map(prop => 
+    const formattedProperties = paginatedProperties.map(prop => 
       formatPropertyOptimized(prop, locationMap, typeMap, imagesMap)
     );
 
-    // 6. Apply pagination if requested
-    const limitNum = limit ? parseInt(limit) : null;
-    const offsetNum = offset ? parseInt(offset) : 0;
-    let paginatedProperties = formattedProperties;
+    console.log(`✅ Formatted ${formattedProperties.length} properties (optimized, total available: ${properties.length})`);
     
-    if (limitNum) {
-      paginatedProperties = formattedProperties.slice(offsetNum, offsetNum + limitNum);
-    } else if (formattedProperties.length > 100) {
-      // Default limit of 100 if no limit specified and we have many properties
-      console.log(`⚠️ Limiting to first 100 properties (total: ${formattedProperties.length})`);
-      paginatedProperties = formattedProperties.slice(0, 100);
-    }
-
-    console.log(`✅ Formatted ${paginatedProperties.length} properties (optimized, total available: ${formattedProperties.length})`);
-    
-    res.json(paginatedProperties);
+    // Return with pagination metadata
+    res.json({
+      properties: formattedProperties,
+      pagination: {
+        total: properties.length,
+        limit: limitNum,
+        offset: offsetNum,
+        hasMore: (offsetNum + limitNum) < properties.length
+      }
+    });
   } catch (error) {
     console.error('Get properties error:', error);
     
