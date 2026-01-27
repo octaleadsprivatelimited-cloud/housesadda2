@@ -12,6 +12,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "populate-demo": "node server/scripts/populate-demo-properties.js",
+    "add-15-demo": "node server/scripts/add-15-demo-properties.js",
     "update-images": "node server/scripts/update-property-images.js",
     "add-50-properties": "node server/scripts/add-50-more-properties.js"
   },
