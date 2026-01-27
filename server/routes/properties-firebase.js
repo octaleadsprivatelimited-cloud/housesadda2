@@ -222,11 +222,22 @@ router.get('/', async (req, res) => {
     }
 
     if (type) {
+      // Try exact match first
       const typeSnapshot = await db.collection('property_types')
         .where('name', '==', type)
         .limit(1)
         .get();
-      if (!typeSnapshot.empty) typeId = typeSnapshot.docs[0].id;
+      if (!typeSnapshot.empty) {
+        typeId = typeSnapshot.docs[0].id;
+      } else {
+        // If exact match fails, try case-insensitive search
+        const allTypes = await db.collection('property_types').get();
+        const matched = allTypes.docs.find(doc => {
+          const typeData = doc.data();
+          return typeData.name && typeData.name.toLowerCase() === type.toLowerCase();
+        });
+        if (matched) typeId = matched.id;
+      }
     }
 
     // Apply filters
