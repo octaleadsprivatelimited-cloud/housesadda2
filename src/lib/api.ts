@@ -216,20 +216,53 @@ export const authAPI = {
   },
 };
 
-// Properties API
-export const propertiesAPI = {
-  getAll: async (params?: {
-    search?: string;
-    type?: string;
-    city?: string;
-    area?: string;
-    featured?: boolean;
-    active?: boolean;
-    transactionType?: string;
-    limit?: number;
-    offset?: number;
-    skipImages?: boolean;
-  }) => {
+       // Properties API
+       export const propertiesAPI = {
+         // Search API - optimized for home page filters
+         search: async (params?: {
+           transactionType?: string;
+           area?: string;
+           type?: string;
+           city?: string;
+           budget?: string; // Format: "min-max" or "min-" or "-max"
+           minPrice?: number;
+           maxPrice?: number;
+           limit?: number;
+           offset?: number;
+           skipImages?: boolean;
+         }) => {
+           const queryParams = new URLSearchParams();
+           if (params) {
+             Object.entries(params).forEach(([key, value]) => {
+               if (value !== undefined && value !== null) {
+                 const stringValue = typeof value === 'boolean' ? String(value) : String(value);
+                 queryParams.append(key, stringValue);
+               }
+             });
+           }
+           const query = queryParams.toString();
+           const url = `/properties/search${query ? `?${query}` : ''}`;
+           if (import.meta.env.DEV) {
+             console.log('🔍 Search API Call:', url);
+           }
+           const response = await apiRequest(url);
+           return response;
+         },
+
+         getAll: async (params?: {
+           search?: string;
+           type?: string;
+           city?: string;
+           area?: string;
+           featured?: boolean;
+           active?: boolean;
+           transactionType?: string;
+           minPrice?: number;
+           maxPrice?: number;
+           limit?: number;
+           offset?: number;
+           skipImages?: boolean;
+         }) => {
     const queryParams = new URLSearchParams();
     if (params) {
       Object.entries(params).forEach(([key, value]) => {

@@ -267,8 +267,26 @@ router.get('/', async (req, res) => {
       const searchLower = search.toLowerCase();
       properties = properties.filter(prop =>
         (prop.title || '').toLowerCase().includes(searchLower) ||
-        (prop.description || '').toLowerCase().includes(searchLower)
+        (prop.description || '').toLowerCase().includes(searchLower) ||
+        (prop.id || '').toLowerCase().includes(searchLower)
       );
+    }
+
+    // Apply budget filter (price range)
+    const minPrice = req.query.minPrice ? parseFloat(req.query.minPrice) : null;
+    const maxPrice = req.query.maxPrice ? parseFloat(req.query.maxPrice) : null;
+    if (minPrice !== null || maxPrice !== null) {
+      properties = properties.filter(prop => {
+        const price = parseFloat(prop.price) || 0;
+        if (minPrice !== null && maxPrice !== null) {
+          return price >= minPrice && price <= maxPrice;
+        } else if (minPrice !== null) {
+          return price >= minPrice;
+        } else if (maxPrice !== null) {
+          return price <= maxPrice;
+        }
+        return true;
+      });
     }
 
     // Apply pagination
