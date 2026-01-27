@@ -245,6 +245,12 @@ router.get('/', async (req, res) => {
     if (locationId) query = query.where('location_id', '==', locationId);
     if (featured !== undefined) query = query.where('is_featured', '==', featured === 'true');
     if (transactionType) query = query.where('transaction_type', '==', transactionType);
+    
+    // Apply active filter at Firestore level (default to true for public queries)
+    // Only filter by active if explicitly requested, otherwise default to active=true
+    const shouldFilterActive = active !== undefined;
+    const activeValue = shouldFilterActive ? (active === 'true') : true;
+    query = query.where('is_active', '==', activeValue);
 
     // Order and limit at Firestore level for better performance
     query = query.orderBy('created_at', 'desc');
@@ -252,15 +258,6 @@ router.get('/', async (req, res) => {
 
     const snapshot = await query.get();
     let properties = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-    // Apply active filter in memory if needed
-    if (active !== undefined) {
-      const activeValue = active === 'true';
-      properties = properties.filter(prop => {
-        const propActive = prop.is_active === true || prop.is_active === 'true';
-        return propActive === activeValue;
-      });
-    }
 
     // Apply search filter
     if (search) {
