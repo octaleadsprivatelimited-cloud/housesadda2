@@ -275,13 +275,13 @@ const PropertyDetail = () => {
           </div>
         </div>
 
-        <div className="container py-4 md:py-6">
-          <div className="grid lg:grid-cols-3 gap-4 md:gap-6">
+        <div className="container py-3 sm:py-4 md:py-6 px-3 sm:px-4">
+          <div className="grid lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
             {/* Left Column - Main Content */}
             <div className="lg:col-span-2 space-y-4 md:space-y-6">
               {/* Magicbricks-style Image Gallery */}
               <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-                <div className="relative aspect-[16/9] bg-gray-100">
+                <div className="relative aspect-[4/3] sm:aspect-[16/9] bg-gray-100">
                   <img
                     src={propertyData.images[currentImage]}
                     alt={`${propertyData.title} - Image ${currentImage + 1}`}
@@ -300,51 +300,51 @@ const PropertyDetail = () => {
                     <>
                       <button
                         onClick={prevImage}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-white/95 hover:bg-white shadow-lg transition-all z-10 backdrop-blur-sm"
+                        className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 p-2 sm:p-2.5 rounded-full bg-white/95 hover:bg-white shadow-lg transition-all z-10 backdrop-blur-sm touch-manipulation"
                         aria-label="Previous image"
                       >
-                        <ChevronLeft className="h-5 w-5 text-gray-800" />
+                        <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5 text-gray-800" />
                       </button>
                       <button
                         onClick={nextImage}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-white/95 hover:bg-white shadow-lg transition-all z-10 backdrop-blur-sm"
+                        className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 p-2 sm:p-2.5 rounded-full bg-white/95 hover:bg-white shadow-lg transition-all z-10 backdrop-blur-sm touch-manipulation"
                         aria-label="Next image"
                       >
-                        <ChevronRight className="h-5 w-5 text-gray-800" />
+                        <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5 text-gray-800" />
                       </button>
                     </>
                   )}
 
                   {/* Image Counter - Magicbricks Style */}
                   {propertyData.images.length > 1 && (
-                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/75 text-white px-4 py-1.5 rounded-full text-sm font-medium backdrop-blur-sm">
+                    <div className="absolute bottom-2 sm:bottom-3 left-1/2 -translate-x-1/2 bg-black/75 text-white px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium backdrop-blur-sm">
                       {currentImage + 1} / {propertyData.images.length}
                     </div>
                   )}
 
                   {/* Action Buttons */}
-                  <div className="absolute top-3 right-3 flex gap-2">
-                    <button className="p-2.5 rounded-full bg-white/95 hover:bg-white shadow-lg transition-all backdrop-blur-sm" aria-label="Share">
-                      <Share2 className="h-5 w-5 text-gray-800" />
+                  <div className="absolute top-2 sm:top-3 right-2 sm:right-3 flex gap-1.5 sm:gap-2">
+                    <button className="p-2 sm:p-2.5 rounded-full bg-white/95 hover:bg-white shadow-lg transition-all backdrop-blur-sm touch-manipulation" aria-label="Share">
+                      <Share2 className="h-4 w-4 sm:h-5 sm:w-5 text-gray-800" />
                     </button>
-                    <button className="p-2.5 rounded-full bg-white/95 hover:bg-white shadow-lg transition-all backdrop-blur-sm" aria-label="Save">
-                      <Heart className="h-5 w-5 text-gray-800" />
+                    <button className="p-2 sm:p-2.5 rounded-full bg-white/95 hover:bg-white shadow-lg transition-all backdrop-blur-sm touch-manipulation" aria-label="Save">
+                      <Heart className="h-4 w-4 sm:h-5 sm:w-5 text-gray-800" />
                     </button>
                   </div>
                 </div>
 
                 {/* Thumbnail Strip - Magicbricks Style */}
                 {propertyData.images.length > 1 && (
-                  <div className="p-3 border-t border-gray-200 bg-gray-50">
-                    <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+                  <div className="p-2 sm:p-3 border-t border-gray-200 bg-gray-50">
+                    <div className="flex gap-1.5 sm:gap-2 overflow-x-auto scrollbar-hide pb-1 snap-x snap-mandatory">
                       {propertyData.images.slice(0, showAllImages ? propertyData.images.length : 6).map((img, index) => (
                         <button
                           key={index}
                           onClick={() => setCurrentImage(index)}
-                          className={`flex-shrink-0 w-20 h-16 rounded-md overflow-hidden border-2 transition-all ${
+                          className={`flex-shrink-0 w-16 h-12 sm:w-20 sm:h-16 rounded-md overflow-hidden border-2 transition-all snap-start touch-manipulation ${
                             index === currentImage 
-                              ? 'border-primary ring-2 ring-primary/30 shadow-md' 
-                              : 'border-gray-300 opacity-70 hover:opacity-100 hover:border-gray-400'
+                              ? 'border-primary ring-2 ring-primary/30 shadow-md scale-105' 
+                              : 'border-gray-300 opacity-70 hover:opacity-100 hover:border-gray-400 active:scale-95'
                           }`}
                         >
                           <img 
@@ -364,7 +364,7 @@ const PropertyDetail = () => {
                       {propertyData.images.length > 6 && !showAllImages && (
                         <button
                           onClick={() => setShowAllImages(true)}
-                          className="flex-shrink-0 w-20 h-16 rounded-md border-2 border-dashed border-gray-300 hover:border-primary hover:text-primary transition-colors flex items-center justify-center text-gray-600 bg-gray-50"
+                          className="flex-shrink-0 w-16 h-12 sm:w-20 sm:h-16 rounded-md border-2 border-dashed border-gray-300 hover:border-primary hover:text-primary transition-colors flex items-center justify-center text-gray-600 bg-gray-50 snap-start touch-manipulation"
                         >
                           <span className="text-xs font-medium">+{propertyData.images.length - 6}</span>
                         </button>
@@ -375,9 +375,9 @@ const PropertyDetail = () => {
               </div>
 
               {/* Magicbricks-style Property Header */}
-              <div className="bg-white rounded-lg shadow-sm p-5 md:p-6">
+              <div className="bg-white rounded-lg shadow-sm p-4 sm:p-5 md:p-6">
                 {/* Title and Price Row */}
-                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-4">
+                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3 sm:gap-4 mb-3 sm:mb-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2 flex-wrap">
                       <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-md text-xs md:text-sm font-semibold">
@@ -394,16 +394,16 @@ const PropertyDetail = () => {
                         Verified
                       </span>
                     </div>
-                    <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-gray-900 mb-2 leading-tight">
+                    <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-gray-900 mb-2 leading-tight">
                       {propertyData.title}
                     </h1>
-                    <div className="flex items-center gap-2 text-gray-600 mb-3">
-                      <MapPin className="h-4 w-4 text-primary flex-shrink-0" />
-                      <span className="text-sm md:text-base">{propertyData.area}, {propertyData.city}</span>
+                    <div className="flex items-center gap-2 text-gray-600 mb-2 sm:mb-3">
+                      <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary flex-shrink-0" />
+                      <span className="text-xs sm:text-sm md:text-base">{propertyData.area}, {propertyData.city}</span>
                     </div>
                   </div>
                   <div className="text-left md:text-right">
-                    <div className="text-2xl md:text-3xl lg:text-4xl font-bold text-primary mb-1">
+                    <div className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-primary mb-1">
                       {formatPrice(propertyData.price)}
                     </div>
                     {propertyData.sqft && propertyData.sqft > 0 && (

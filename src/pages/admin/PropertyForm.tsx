@@ -488,8 +488,8 @@ const PropertyForm = () => {
             </div>
           </div>
           
-          <div className="p-6 space-y-5">
-            <div className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center hover:border-primary/50 hover:bg-gray-50 transition-colors">
+          <div className="p-4 sm:p-6 space-y-4 sm:space-y-5">
+            <div className="border-2 border-dashed border-gray-200 rounded-xl p-6 sm:p-8 text-center hover:border-primary/50 hover:bg-gray-50 transition-colors">
               <input
                 type="file"
                 accept="image/*"
@@ -498,34 +498,45 @@ const PropertyForm = () => {
                 className="hidden"
                 id="image-upload"
               />
-              <label htmlFor="image-upload" className="cursor-pointer">
-                <div className="p-3 bg-gray-100 rounded-full w-fit mx-auto mb-3">
-                  <Upload className="h-8 w-8 text-gray-400" />
+              <label htmlFor="image-upload" className="cursor-pointer block">
+                <div className="p-2 sm:p-3 bg-gray-100 rounded-full w-fit mx-auto mb-2 sm:mb-3">
+                  <Upload className="h-6 w-6 sm:h-8 sm:w-8 text-gray-400" />
                 </div>
-                <p className="font-medium text-gray-700">Click to upload images</p>
-                <p className="text-sm text-gray-500">Images will be auto-compressed to ~11KB each</p>
+                <p className="font-medium text-gray-700 text-sm sm:text-base">Click to upload images</p>
+                <p className="text-xs sm:text-sm text-gray-500 mt-1">Images will be auto-compressed to ~11KB each</p>
+                <p className="text-xs text-gray-400 mt-1">You can upload multiple images at once</p>
               </label>
             </div>
 
             {images.length > 0 && (
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                {images.map((image, index) => (
-                  <div key={index} className="relative aspect-video rounded-lg overflow-hidden group border border-gray-200">
-                    <img src={image} alt="" className="w-full h-full object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => removeImage(index)}
-                      className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                    {index === 0 && (
-                      <span className="absolute bottom-2 left-2 text-xs bg-blue-500 text-white px-2 py-0.5 rounded-full font-medium">
-                        Cover
-                      </span>
-                    )}
-                  </div>
-                ))}
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-3">
+                  {images.length} image{images.length > 1 ? 's' : ''} uploaded
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
+                  {images.map((image, index) => (
+                    <div key={index} className="relative aspect-video rounded-lg overflow-hidden group border border-gray-200 bg-gray-50">
+                      <img src={image} alt={`Property image ${index + 1}`} className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => removeImage(index)}
+                        className="absolute top-1 right-1 sm:top-2 sm:right-2 p-1 sm:p-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full opacity-90 sm:opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                        aria-label={`Remove image ${index + 1}`}
+                      >
+                        <X className="h-3 w-3 sm:h-4 sm:w-4" />
+                      </button>
+                      {index === 0 && (
+                        <span className="absolute bottom-1 left-1 sm:bottom-2 sm:left-2 text-xs bg-blue-500 text-white px-1.5 sm:px-2 py-0.5 rounded-full font-medium">
+                          Cover
+                        </span>
+                      )}
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors" />
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  💡 First image will be used as the cover image
+                </p>
               </div>
             )}
           </div>
