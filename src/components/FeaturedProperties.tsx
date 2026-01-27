@@ -17,7 +17,10 @@ export function FeaturedProperties() {
   const loadFeaturedProperties = async () => {
     try {
       setIsLoading(true);
-      const data = await propertiesAPI.getAll({ featured: true, active: true });
+      const response = await propertiesAPI.getAll({ featured: true, active: true, limit: 10 });
+      
+      // Handle both old format (array) and new format (object with pagination)
+      const data = Array.isArray(response) ? response : (response.properties || response || []);
       
       const transformed: Property[] = data.slice(0, 5).map((prop: any) => ({
         id: String(prop.id),

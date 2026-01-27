@@ -29,7 +29,12 @@ export function CategoryCards() {
   const loadCategories = async () => {
     try {
       setIsLoading(true);
-      const properties = await propertiesAPI.getAll({ active: true });
+      const response = await propertiesAPI.getAll({ active: true, limit: 100 });
+      
+      // Handle both old format (array) and new format (object with pagination)
+      const properties = Array.isArray(response) 
+        ? response 
+        : (response.properties || response || []);
       
       // Count properties by different categories
       const totalCount = properties.length;

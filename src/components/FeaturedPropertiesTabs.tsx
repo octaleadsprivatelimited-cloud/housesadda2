@@ -87,7 +87,11 @@ export function FeaturedPropertiesTabs() {
   const loadAllProperties = async () => {
     try {
       setIsLoading(true);
-      const data = await propertiesAPI.getAll({ active: true });
+      // Request more properties for category filtering (50 should be enough)
+      const response = await propertiesAPI.getAll({ active: true, limit: 50 });
+      
+      // Handle both old format (array) and new format (object with pagination)
+      const data = Array.isArray(response) ? response : (response.properties || response || []);
       
       const transformed: Property[] = data.map((prop: any) => ({
         id: String(prop.id),

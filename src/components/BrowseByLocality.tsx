@@ -20,10 +20,15 @@ export function BrowseByLocality() {
     try {
       setIsLoading(true);
       // Fetch locations and properties count
-      const [locations, properties] = await Promise.all([
+      const [locations, propertiesResponse] = await Promise.all([
         locationsAPI.getAll(),
-        propertiesAPI.getAll({ active: true })
+        propertiesAPI.getAll({ active: true, limit: 100 }) // Get more for accurate counts
       ]);
+
+      // Handle both old format (array) and new format (object with pagination)
+      const properties = Array.isArray(propertiesResponse) 
+        ? propertiesResponse 
+        : (propertiesResponse.properties || propertiesResponse || []);
 
       // Count properties by area
       const areaCounts: Record<string, number> = {};

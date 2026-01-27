@@ -16,7 +16,10 @@ export function LatestProperties() {
   const loadLatestProperties = async () => {
     try {
       setIsLoading(true);
-      const data = await propertiesAPI.getAll({ active: true });
+      const response = await propertiesAPI.getAll({ active: true, limit: 20 });
+      
+      // Handle both old format (array) and new format (object with pagination)
+      const data = Array.isArray(response) ? response : (response.properties || response || []);
       
       // Sort by created date and take latest 6
       const sorted = data.sort((a: any, b: any) => 
