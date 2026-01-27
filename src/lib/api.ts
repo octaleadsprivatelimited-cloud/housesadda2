@@ -13,12 +13,16 @@ const getApiBaseUrl = () => {
   // In production, use relative URL to avoid localhost issues
   // This assumes the API is on the same domain or proxied via Vercel
   if (isProduction) {
-    console.log('🌐 Using relative API URL for production');
+    if (import.meta.env.DEV) {
+      console.log('🌐 Using relative API URL for production');
+    }
     return '/api';
   }
   
   // In development, use localhost
-  console.log('🌐 Using localhost API URL for development');
+  if (import.meta.env.DEV) {
+    console.log('🌐 Using localhost API URL for development');
+  }
   return 'http://localhost:3001/api';
 };
 
@@ -66,7 +70,9 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}, timeout: 
   if (cacheKey) {
     const cached = getCachedResponse(cacheKey);
     if (cached) {
-      console.log('📦 Using cached response for:', endpoint);
+      if (import.meta.env.DEV) {
+        console.log('📦 Using cached response for:', endpoint);
+      }
       return cached;
     }
   }
