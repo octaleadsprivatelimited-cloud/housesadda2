@@ -44,13 +44,7 @@ export default defineConfig({
     // Ensure proper asset handling
     assetsDir: 'assets',
     sourcemap: false, // Disable sourcemaps in production for smaller bundle
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: true, // Remove console.log in production
-        drop_debugger: true,
-      },
-    },
+    minify: 'esbuild', // Use esbuild (faster and built-in) instead of terser
   },
   optimizeDeps: {
     // Pre-bundle dependencies for faster dev server
