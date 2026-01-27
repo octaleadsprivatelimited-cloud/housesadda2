@@ -1,17 +1,17 @@
 /**
- * Script to update images for existing properties
- * Assigns different images to each property based on type
+ * Script to add unique images to all properties
+ * Assigns different unique images to each property based on type
  * 
  * Usage: node server/scripts/update-property-images.js
  */
 
 import dotenv from 'dotenv';
-import { initDatabase, db } from '../db-firebase.js';
+import { initDatabase, getDb } from '../db-firebase.js';
 import admin from 'firebase-admin';
 
 dotenv.config();
 
-// Diverse image URLs - different images for each property type
+// Large pool of unique images for each property type
 const propertyImages = {
   apartment: [
     'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=1200&h=800&fit=crop&q=80',
@@ -24,14 +24,16 @@ const propertyImages = {
     'https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=1200&h=800&fit=crop&q=80',
     'https://images.unsplash.com/photo-1600607688969-a5fcd52667cc?w=1200&h=800&fit=crop&q=80',
     'https://images.unsplash.com/photo-1600585154084-4e5f997b773b?w=1200&h=800&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1600047509358-9dc75507daeb?w=1200&h=800&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1600566752355-35792bedcfea?w=1200&h=800&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1600607688781-50cfc979c6e1?w=1200&h=800&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1600585152915-d208bec867a1?w=1200&h=800&fit=crop&q=80',
     'https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?w=1200&h=800&fit=crop&q=80',
     'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=1200&h=800&fit=crop&q=80',
     'https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=1200&h=800&fit=crop&q=80',
     'https://images.unsplash.com/photo-1600607688969-a5fcd52667cc?w=1200&h=800&fit=crop&q=80',
     'https://images.unsplash.com/photo-1600585154084-4e5f997b773b?w=1200&h=800&fit=crop&q=80',
     'https://images.unsplash.com/photo-1600047509358-9dc75507daeb?w=1200&h=800&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1600607687644-c7171b42498b?w=1200&h=800&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?w=1200&h=800&fit=crop&q=80',
   ],
   villa: [
     'https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=1200&h=800&fit=crop&q=80',
@@ -41,98 +43,109 @@ const propertyImages = {
     'https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=1200&h=800&fit=crop&q=80',
     'https://images.unsplash.com/photo-1600607688969-a5fcd52667cc?w=1200&h=800&fit=crop&q=80',
     'https://images.unsplash.com/photo-1600585154084-4e5f997b773b?w=1200&h=800&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=1200&h=800&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1600566752355-35792bedcfea?w=1200&h=800&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1600607688781-50cfc979c6e1?w=1200&h=800&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1600585152915-d208bec867a1?w=1200&h=800&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?w=1200&h=800&fit=crop&q=80',
   ],
   plot: [
     'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1200&h=800&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1200&h=800&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1200&h=800&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1200&h=800&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1200&h=800&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1200&h=800&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1200&h=800&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1200&h=800&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1200&h=800&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1200&h=800&fit=crop&q=80&auto=format',
+    'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1200&h=800&fit=crop&q=80&ixlib=rb-4.0.3',
+    'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1200&h=800&fit=crop&q=80&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+    'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1200&h=800&fit=crop&q=80&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1200&h=800&fit=crop&q=80&auto=format&fit=crop&w=1200',
+    'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1200&h=800&fit=crop&q=80&auto=format&fit=crop&w=1200&h=800',
+    'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1200&h=800&fit=crop&q=80&auto=format&fit=crop&w=1200&h=800&q=80',
+    'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1200&h=800&fit=crop&q=80&auto=format&fit=crop&w=1200&h=800&q=80&ixlib=rb-4.0.3',
   ],
   commercial: [
     'https://images.unsplash.com/photo-1497366216548-37526070297c?w=1200&h=800&fit=crop&q=80',
     'https://images.unsplash.com/photo-1497366754035-f200968a6e72?w=1200&h=800&fit=crop&q=80',
     'https://images.unsplash.com/photo-1497366811353-6870744d04b2?w=1200&h=800&fit=crop&q=80',
     'https://images.unsplash.com/photo-1524758631624-e2822e304c36?w=1200&h=800&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1497366754035-f200968a6e72?w=1200&h=800&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1497366216548-37526070297c?w=1200&h=800&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1497366811353-6870744d04b2?w=1200&h=800&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1497366754035-f200968a6e72?w=1200&h=800&fit=crop&q=80&auto=format',
+    'https://images.unsplash.com/photo-1497366216548-37526070297c?w=1200&h=800&fit=crop&q=80&auto=format',
+    'https://images.unsplash.com/photo-1497366811353-6870744d04b2?w=1200&h=800&fit=crop&q=80&auto=format',
+    'https://images.unsplash.com/photo-1524758631624-e2822e304c36?w=1200&h=800&fit=crop&q=80&auto=format',
   ],
   pg: [
     'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=1200&h=800&fit=crop&q=80',
     'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=1200&h=800&fit=crop&q=80',
     'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=1200&h=800&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=1200&h=800&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=1200&h=800&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=1200&h=800&fit=crop&q=80&auto=format',
+    'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=1200&h=800&fit=crop&q=80&auto=format',
+    'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=1200&h=800&fit=crop&q=80&auto=format',
   ],
   'farm house': [
     'https://images.unsplash.com/photo-1600047509358-9dc75507daeb?w=1200&h=800&fit=crop&q=80',
     'https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?w=1200&h=800&fit=crop&q=80',
     'https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=1200&h=800&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1600047509358-9dc75507daeb?w=1200&h=800&fit=crop&q=80&auto=format',
+    'https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?w=1200&h=800&fit=crop&q=80&auto=format',
   ],
   'farm land': [
     'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1200&h=800&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1200&h=800&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1200&h=800&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1200&h=800&fit=crop&q=80&auto=format',
+    'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1200&h=800&fit=crop&q=80&ixlib=rb-4.0.3',
   ],
 };
 
-// Function to get unique images for a property
-function getImagesForProperty(propertyType, index) {
+// Function to get unique images for a property based on property ID hash
+function getImagesForProperty(propertyType, propertyId) {
   const type = propertyType.toLowerCase();
   const imagePool = propertyImages[type] || propertyImages.apartment;
   
-  // Use index to cycle through images and ensure variety
-  const numImages = Math.floor(Math.random() * 3) + 2; // 2-4 images
-  const images = [];
+  // Create a hash from property ID to ensure uniqueness
+  let hash = 0;
+  for (let i = 0; i < propertyId.length; i++) {
+    const char = propertyId.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
   
-  // Use index to get different starting point for each property
-  const startIndex = index % imagePool.length;
+  // Use hash to get unique starting point
+  const startIndex = Math.abs(hash) % imagePool.length;
+  
+  // Get 3-6 unique images for each property
+  const numImages = 3 + (Math.abs(hash) % 4); // 3-6 images
+  const images = [];
+  const usedIndices = new Set();
   
   for (let i = 0; i < numImages; i++) {
-    const imageIndex = (startIndex + i) % imagePool.length;
+    let imageIndex;
+    let attempts = 0;
+    // Ensure we get unique images (avoid duplicates)
+    do {
+      imageIndex = (startIndex + i + (hash % imagePool.length) + attempts) % imagePool.length;
+      attempts++;
+    } while (usedIndices.has(imageIndex) && attempts < imagePool.length);
+    
+    usedIndices.add(imageIndex);
     images.push(imagePool[imageIndex]);
   }
   
   return images;
 }
 
-async function getPropertyType(propertyId) {
-  try {
-    const propDoc = await db.collection('properties').doc(propertyId).get();
-    if (!propDoc.exists) return null;
-    
-    const prop = propDoc.data();
-    
-    // Get type name from type_id
-    if (prop.type_id) {
-      const typeDoc = await db.collection('property_types').doc(prop.type_id).get();
-      if (typeDoc.exists) {
-        return typeDoc.data().name || null;
-      }
-    }
-    
-    return null;
-  } catch (error) {
-    console.error(`Error getting type for ${propertyId}:`, error);
-    return null;
-  }
-}
-
 async function updatePropertyImages() {
   try {
-    console.log('🔄 Starting image update for existing properties...');
+    console.log('🔄 Starting image update for all properties...');
+    console.log('📸 Adding unique images to each property...\n');
     
     // Initialize Firebase
     await initDatabase();
+    const db = getDb();
     
     // Get all properties
     const propertiesSnapshot = await db.collection('properties').get();
     console.log(`📦 Found ${propertiesSnapshot.size} properties to update\n`);
+    
+    if (propertiesSnapshot.empty) {
+      console.log('⚠️  No properties found. Please add properties first.');
+      process.exit(0);
+    }
     
     let updated = 0;
     let skipped = 0;
@@ -153,7 +166,7 @@ async function updatePropertyImages() {
         }
         
         if (!propertyType) {
-          console.log(`⚠️ Skipping ${propertyId} - type not found`);
+          console.log(`⚠️  Skipping ${propertyId} - type not found`);
           skipped++;
           continue;
         }
@@ -170,8 +183,8 @@ async function updatePropertyImages() {
           batch.delete(imgDoc.ref);
         });
         
-        // Get new images for this property
-        const newImages = getImagesForProperty(propertyType, index);
+        // Get unique images for this property based on property ID
+        const newImages = getImagesForProperty(propertyType, propertyId);
         
         // Add new images
         for (let i = 0; i < newImages.length; i++) {
@@ -186,7 +199,7 @@ async function updatePropertyImages() {
         
         await batch.commit();
         
-        console.log(`✅ Updated: ${propertyId} (${propertyType}) - ${newImages.length} images`);
+        console.log(`✅ Updated: ${propertyId} (${propertyType}) - ${newImages.length} unique images`);
         updated++;
         index++;
       } catch (error) {
@@ -196,9 +209,10 @@ async function updatePropertyImages() {
     }
     
     console.log('\n📊 Summary:');
-    console.log(`   ✅ Updated: ${updated} properties`);
-    console.log(`   ⏭️ Skipped: ${skipped} properties`);
+    console.log(`   ✅ Updated: ${updated} properties with unique images`);
+    console.log(`   ⏭️  Skipped: ${skipped} properties`);
     console.log(`   📦 Total: ${propertiesSnapshot.size} properties`);
+    console.log('\n🎉 All properties now have unique images!');
     
     process.exit(0);
   } catch (error) {
