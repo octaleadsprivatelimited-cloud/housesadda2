@@ -1,16 +1,24 @@
 import express from 'express';
-import { db } from '../db-firebase.js';
+import { getDb } from '../db-firebase.js';
+import admin from 'firebase-admin';
 
 const router = express.Router();
 
-// Get social media settings (public endpoint for header)
+function getDatabase() {
+  if (!admin.apps.length) {
+    throw new Error('Firebase Admin SDK not initialized. Please restart the server.');
+  }
+  return getDb();
+}
+
+// Get social media settings
 router.get('/social-media', async (req, res) => {
   try {
+    const db = getDatabase();
     const settingsRef = db.collection('settings').doc('social_media');
     const settingsDoc = await settingsRef.get();
-    
+
     if (!settingsDoc.exists) {
-      // Return default empty values
       return res.json({
         success: true,
         data: {
@@ -23,7 +31,7 @@ router.get('/social-media', async (req, res) => {
         }
       });
     }
-    
+
     const data = settingsDoc.data();
     res.json({
       success: true,
@@ -38,7 +46,6 @@ router.get('/social-media', async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching social media settings:', error);
-    // Return empty defaults on error so header doesn't break
     res.json({
       success: true,
       data: {

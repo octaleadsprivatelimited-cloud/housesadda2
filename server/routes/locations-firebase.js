@@ -1,73 +1,56 @@
 import express from 'express';
-import { db } from '../db-firebase.js';
+import { getDb } from '../db-firebase.js';
 import admin from 'firebase-admin';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
+function getDatabase() {
+  if (!admin.apps.length) {
+    throw new Error('Firebase Admin SDK not initialized. Please restart the server.');
+  }
+  return getDb();
+}
+
 // Get all locations
 router.get('/', async (req, res) => {
   try {
+    const db = getDatabase();
     const { city } = req.query;
-    
+
     let query = db.collection('locations');
+    if (city) query = query.where('city', '==', city);
 
-    if (city) {
-      query = query.where('city', '==', city);
-    }
-
-    // Firestore: Get all documents without orderBy to avoid index requirements
-    // We'll sort in JavaScript instead
     const snapshot = await query.get();
+    const locations = snapshot.docs.map(doc => ({
+      id: doc.id,
+      name: doc.data().name || '',
+      city: doc.data().city || ''
+    }));
 
-    let locations = snapshot.docs.map(doc => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        name: data.name || '',
-        city: data.city || '',
-        created_at: data.created_at || null
-      };
-    });
-
-    // Sort by city first, then by name within each city
+    // Sort by city, then name
     locations.sort((a, b) => {
-      const cityA = (a.city || '').toLowerCase();
-      const cityB = (b.city || '').toLowerCase();
-      if (cityA !== cityB) {
-        return cityA.localeCompare(cityB);
-      }
-      const nameA = (a.name || '').toLowerCase();
-      const nameB = (b.name || '').toLowerCase();
-      return nameA.localeCompare(nameB);
+      if (a.city !== b.city) return a.city.localeCompare(b.city);
+      return a.name.localeCompare(b.name);
     });
 
-    console.log(`✅ Retrieved ${locations.length} locations`);
     res.json(locations);
   } catch (error) {
-    console.error('❌ Get locations error:', error);
-    console.error('   Error message:', error.message);
-    console.error('   Error code:', error.code);
-    if (error.stack) {
-      console.error('   Stack:', error.stack);
+    console.error('Get locations error:', error);
+    if (error.message.includes('not initialized')) {
+      return res.status(503).json({
+        error: 'Database not available',
+        message: error.message
+      });
     }
-    
-    // Provide more detailed error information
-    res.status(500).json({ 
-      error: 'Internal server error',
-      message: error.message || 'Failed to retrieve locations',
-      code: error.code || 'UNKNOWN_ERROR',
-      ...(process.env.NODE_ENV === 'development' && { 
-        stack: error.stack,
-        details: error.toString()
-      })
-    });
+    res.status(500).json({ error: 'Internal server error', message: error.message });
   }
 });
 
 // Create location (protected)
 router.post('/', authenticateToken, async (req, res) => {
   try {
+    const db = getDatabase();
     const { name, city } = req.body;
 
     if (!name || !city) {
@@ -94,39 +77,36 @@ router.post('/', authenticateToken, async (req, res) => {
     res.json({ success: true, id: docRef.id });
   } catch (error) {
     console.error('Create location error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error', message: error.message });
   }
 });
 
 // Update location (protected)
 router.put('/:id', authenticateToken, async (req, res) => {
   try {
+    const db = getDatabase();
     const { id } = req.params;
     const { name, city } = req.body;
 
-    await db.collection('locations').doc(id).update({
-      name,
-      city
-    });
-
+    await db.collection('locations').doc(id).update({ name, city });
     res.json({ success: true });
   } catch (error) {
     console.error('Update location error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error', message: error.message });
   }
 });
 
 // Delete location (protected)
 router.delete('/:id', authenticateToken, async (req, res) => {
   try {
+    const db = getDatabase();
     const { id } = req.params;
-    
-    await db.collection('locations').doc(id).delete();
 
+    await db.collection('locations').doc(id).delete();
     res.json({ success: true });
   } catch (error) {
     console.error('Delete location error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error', message: error.message });
   }
 });
 

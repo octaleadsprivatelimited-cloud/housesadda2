@@ -46,9 +46,9 @@ const App = () => (
           <Route path="/contact" element={<Contact />} />
           
           {/* Admin Routes */}
+          <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin" element={<AdminLogin />} />
           <Route path="/admin/*" element={<AdminLayout />}>
-            <Route index element={<AdminDashboard />} />
             <Route path="dashboard" element={<AdminDashboard />} />
             <Route path="properties" element={<AdminProperties />} />
             <Route path="properties/new" element={<PropertyForm />} />

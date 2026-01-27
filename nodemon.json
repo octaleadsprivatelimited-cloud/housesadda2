@@ -1,0 +1,11 @@
+{
+  "watch": ["server", ".env"],
+  "ext": "js,json",
+  "ignore": ["node_modules", "*.test.js", "*.spec.js", "dist", "build"],
+  "exec": "node server/index-firebase.js",
+  "env": {
+    "NODE_ENV": "development"
+  },
+  "delay": 1000,
+  "verbose": true
+}

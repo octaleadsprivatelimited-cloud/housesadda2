@@ -55,46 +55,84 @@ const AdminDashboard = () => {
   const loadDashboardData = async () => {
     try {
       setIsLoading(true);
+      
+      // CRITICAL OPTIMIZATION: Load only minimal data for dashboard stats
+      // Use a small limit and skip images to make it load instantly
       const params: any = { 
-        limit: 100, // Reduced from 500 for better performance
-        skipImages: true // Skip images for dashboard stats
+        limit: 50, // Further reduced for faster loading
+        offset: 0,
+        skipImages: true // Skip images completely for dashboard
       };
       if (selectedFilter !== 'All') {
         params.transactionType = selectedFilter;
       }
       
-      const response = await propertiesAPI.getAll(params);
-      // Handle both array response and object with properties array
-      const allProperties = Array.isArray(response) ? response : (response.properties || response || []);
-      const filteredProperties = allProperties;
+      // Add timeout to prevent hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
       
-      const activeProperties = filteredProperties.filter((p: any) => p.isActive === true || p.isActive === 'true');
-      const featuredProperties = filteredProperties.filter((p: any) => p.isFeatured === true || p.isFeatured === 'true');
+      try {
+        const response = await Promise.race([
+          propertiesAPI.getAll(params),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Request timeout')), 10000)
+          )
+        ]) as any;
+        
+        clearTimeout(timeoutId);
+        
+        // Handle both array response and object with properties array
+        const allProperties = Array.isArray(response) ? response : (response.properties || response || []);
+        const filteredProperties = allProperties;
+        
+        const activeProperties = filteredProperties.filter((p: any) => p.isActive === true || p.isActive === 'true');
+        const featuredProperties = filteredProperties.filter((p: any) => p.isFeatured === true || p.isFeatured === 'true');
 
-      setStats({
-        total: filteredProperties.length,
-        featured: featuredProperties.length,
-        active: activeProperties.length,
-        inactive: filteredProperties.length - activeProperties.length,
-      });
+        setStats({
+          total: filteredProperties.length,
+          featured: featuredProperties.length,
+          active: activeProperties.length,
+          inactive: filteredProperties.length - activeProperties.length,
+        });
 
-      const recent = filteredProperties
-        .sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
-        .slice(0, 4)
-        .map((p: any) => ({
-          id: String(p.id),
-          title: p.title,
-          area: p.area || '',
-          price: formatPrice(p.price),
-          status: p.isActive ? 'Active' : 'Inactive',
-          transactionType: p.transactionType || 'Sale',
-          createdAt: p.createdAt
-        }));
-      
-      setRecentProperties(recent);
+        // Only get recent 4 properties for display
+        const recent = filteredProperties
+          .sort((a: any, b: any) => {
+            const dateA = new Date(a.createdAt || 0).getTime();
+            const dateB = new Date(b.createdAt || 0).getTime();
+            return dateB - dateA;
+          })
+          .slice(0, 4)
+          .map((p: any) => ({
+            id: String(p.id),
+            title: p.title,
+            area: p.area || '',
+            price: formatPrice(p.price),
+            status: p.isActive ? 'Active' : 'Inactive',
+            transactionType: p.transactionType || 'Sale',
+            createdAt: p.createdAt
+          }));
+        
+        setRecentProperties(recent);
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+        if (fetchError.message === 'Request timeout') {
+          console.warn('Dashboard data load timed out, showing cached/empty data');
+          // Set default stats instead of failing
+          setStats({
+            total: 0,
+            featured: 0,
+            active: 0,
+            inactive: 0,
+          });
+          setRecentProperties([]);
+          return; // Don't throw, just show empty state
+        }
+        throw fetchError;
+      }
     } catch (error: any) {
       console.error('Error loading dashboard data:', error);
-      // Show error to user
+      // Show error to user but don't block the UI
       setStats({
         total: 0,
         featured: 0,
@@ -151,10 +189,23 @@ const AdminDashboard = () => {
     },
   ];
 
-  if (isLoading) {
+  // Show UI immediately, load data in background
+  // This prevents the "blank screen" issue
+  if (isLoading && stats.total === 0 && recentProperties.length === 0) {
     return (
-      <div className="flex items-center justify-center h-48">
-        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-bold text-gray-800">Dashboard</h1>
+          <Link to="/admin/properties/new">
+            <Button size="sm" className="bg-teal-500 hover:bg-teal-600 text-white">
+              <Plus className="h-4 w-4 mr-1" />
+              Add
+            </Button>
+          </Link>
+        </div>
+        <div className="flex items-center justify-center h-48">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        </div>
       </div>
     );
   }

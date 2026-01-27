@@ -1,141 +1,89 @@
-# HousesAdda
+# Houses Adda - Property Management System
 
-A modern property listing platform for finding properties in India.
+A modern property listing and management platform built with React, Firebase, and Express.js.
 
-## Project Overview
+## Features
 
-HousesAdda is a React-based web application built with Vite, TypeScript, and Tailwind CSS. It provides a platform for users to browse and search for properties including Buy, Rent, New Projects, Plots, and Commercial spaces.
+- 🏠 Property browsing and search
+- 🔍 Advanced filtering (type, location, price, etc.)
+- 📱 Responsive design for mobile and desktop
+- 🔐 Admin panel for property management
+- 🗄️ Firebase Firestore database
+- 🚀 Deployed on Vercel
 
-## Technologies Used
+## Tech Stack
 
-This project is built with:
+- **Frontend**: React + TypeScript + Vite
+- **Backend**: Express.js + Node.js
+- **Database**: Firebase Firestore
+- **Authentication**: JWT + bcrypt
+- **Deployment**: Vercel (Frontend + API)
 
-- **Frontend:**
-  - Vite
-  - TypeScript
-  - React
-  - shadcn-ui
-  - Tailwind CSS
-  - React Router
-
-- **Backend:**
-  - Node.js
-  - Express
-  - Firebase Firestore (NoSQL cloud database)
-  - JWT Authentication
-  - bcryptjs
-
-## Getting Started
+## Quick Start
 
 ### Prerequisites
 
-- Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-- Firebase account - [Sign up at firebase.google.com](https://firebase.google.com) (free tier available)
+- Node.js 18+ installed
+- Firebase project created
+- Firebase service account key
 
 ### Installation
 
-1. **Clone the repository**
-```sh
-git clone <YOUR_GIT_URL>
-cd housesadda
-```
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-2. **Install dependencies**
-```sh
-npm install
-```
-
-3. **Database Setup (Firebase - Required)**
-
-   This project uses Firebase Firestore as the database. Admin users are automatically created on first run.
-   
-   **Setup Steps:**
-   - Create a Firebase project at [Firebase Console](https://console.firebase.google.com)
-   - Enable Firestore Database in your Firebase project
-   - Go to Project Settings > Service Accounts
-   - Generate a new private key (downloads JSON file)
-   - Configure `.env` with your Firebase credentials (see .env.example for options)
-
-4. **Configure Environment Variables**
-
-   Create a `.env` file in the root directory (copy from `.env.example`):
+3. Create `.env` file in root directory:
    ```env
+   # Server
+   PORT=3001
    NODE_ENV=development
    JWT_SECRET=your-secret-key-change-in-production
-   PORT=3001
+
+   # API
    VITE_API_URL=http://localhost:3001/api
+
+   # Firebase
+   FIREBASE_PROJECT_ID=your-project-id
+   FIREBASE_SERVICE_ACCOUNT={"type":"service_account",...}
    
-   # Firebase Configuration (Backend)
-   # Option 1: Use service account JSON file path
-   FIREBASE_SERVICE_ACCOUNT_PATH=./path/to/serviceAccountKey.json
-   
-   # Option 2: Use individual credentials
-   # FIREBASE_PROJECT_ID=your-project-id
-   # FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
-   # FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@your-project.iam.gserviceaccount.com
+   # Frontend Firebase Config
+   VITE_FIREBASE_API_KEY=your-api-key
+   VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+   VITE_FIREBASE_PROJECT_ID=your-project-id
+   VITE_FIREBASE_STORAGE_BUCKET=your-project.firebasestorage.app
+   VITE_FIREBASE_MESSAGING_SENDER_ID=your-sender-id
+   VITE_FIREBASE_APP_ID=your-app-id
+   VITE_FIREBASE_MEASUREMENT_ID=your-measurement-id
    ```
 
-5. **Start the development servers**
-
-   - Start both frontend and backend:
-   ```sh
+4. Start development servers:
+   ```bash
+   # Start both frontend and backend
    npm run dev:all
+
+   # Or separately:
+   npm run dev          # Frontend only (port 8080)
+   npm run dev:server   # Backend only (port 3001)
    ```
 
-   - Or start them separately:
-   ```sh
-   # Terminal 1 - Frontend
-   npm run dev
+## Default Admin Credentials
 
-   # Terminal 2 - Backend (Firebase)
-   npm run dev:server
-   ```
+- **Username**: `admin`
+- **Password**: `admin123`
 
-### Default Admin Credentials
-
-- **Username:** `admin`
-- **Password:** `admin123`
-
-⚠️ **Important:** Change the default admin password after first login in production!
-
-## Available Scripts
-
-- `npm run dev` - Start the frontend development server
-- `npm run dev:server` - Start the backend API server (Supabase)
-- `npm run dev:all` - Start both frontend and backend concurrently
-- `npm run build` - Build for production
-- `npm run preview` - Preview the production build
-- `npm run lint` - Run ESLint
-
-**Note:** Admin users are created automatically on first server start. No manual setup needed.
-
-## Project Structure
-
-```
-housesadda/
-├── server/              # Backend API
-│   ├── routes/         # API routes
-│   ├── middleware/     # Auth middleware
-│   └── index.js        # Server entry point
-├── database/           # Database files
-│   ├── schema.sql      # Database schema
-│   └── seed.sql        # Seed data
-├── src/
-│   ├── components/     # React components
-│   ├── pages/          # Page components
-│   ├── lib/            # Utilities & API client
-│   └── ...
-└── public/             # Static assets
-```
+⚠️ **Change these in production!**
 
 ## API Endpoints
 
 ### Authentication
-- `POST /api/auth/login` - Admin login
+- `POST /api/auth/login` - Admin login (username/password)
 - `GET /api/auth/verify` - Verify token
 
 ### Properties
-- `GET /api/properties` - Get all properties
+- `GET /api/properties` - Get all properties (with filters)
 - `GET /api/properties/:id` - Get single property
 - `POST /api/properties` - Create property (protected)
 - `PUT /api/properties/:id` - Update property (protected)
@@ -155,61 +103,56 @@ housesadda/
 - `PUT /api/types/:id` - Update type (protected)
 - `DELETE /api/types/:id` - Delete type (protected)
 
-## Features
+### Settings
+- `GET /api/settings/social-media` - Get social media settings
 
-- Property browsing and search
-- Filter by type (Buy, Rent, New Projects, Plots, Commercial)
-- Browse by city and locality
-- Property details page
-- Admin dashboard for property management
-- MySQL database integration
-- JWT-based authentication
-- Responsive design for mobile and desktop
+### Health & Info
+- `GET /api/health` - Health check
+- `GET /api/routes` - List all routes
+- `GET /api/test` - Test endpoint
 
-## Database Schema
+## Database Collections
 
-The database (Firebase Firestore) includes the following collections:
-- `admin_users` - Admin user accounts (created automatically on first run)
-- `properties` - Property listings (with transaction_type: Sale, Rent, Lease, PG)
+- `admin_users` - Admin user accounts
+- `properties` - Property listings
 - `property_types` - Property type definitions
 - `locations` - Location/area data
-- `property_images` - Property image URLs
+- `property_images` - Property images (base64)
+- `settings` - Application settings
 
-**Firebase Firestore:**
-- Cloud-hosted NoSQL database
-- Free tier available
-- Collections are created automatically when data is inserted
-- Admin users are created automatically when you start the server
+## Deployment
 
-## Production Deployment
+### Vercel Deployment
 
-See `DEPLOYMENT.md` for detailed deployment instructions.
+1. Push code to GitHub
+2. Import project in Vercel
+3. Add environment variables in Vercel dashboard
+4. Deploy!
 
-Quick steps:
-1. Build the frontend:
-   ```sh
-   npm run build
-   ```
+The API will be available at `/api/*` routes automatically.
 
-2. Set up environment variables on your production server
+## Project Structure
 
-3. Configure your web server (nginx, Apache) to serve the frontend
+```
+├── api/              # Vercel serverless functions
+├── server/           # Backend Express server
+│   ├── routes/      # API route handlers
+│   ├── middleware/ # Auth middleware
+│   └── utils/       # Utility functions
+├── src/             # Frontend React app
+│   ├── components/  # React components
+│   ├── pages/       # Page components
+│   └── lib/         # Utilities & API client
+├── public/          # Static assets
+└── dist/           # Build output
+```
 
-4. Run the backend server using PM2:
-   ```sh
-   pm2 start ecosystem.config.js
-   ```
+## Development
 
-5. For Firebase: Ensure environment variables are set correctly in your deployment platform
-
-## Security Notes
-
-- Change the default JWT_SECRET in production
-- Use strong passwords for admin accounts
-- Implement rate limiting for API endpoints
-- Use HTTPS in production
-- Regularly update dependencies
+- Frontend: `http://localhost:8080`
+- Backend API: `http://localhost:3001`
+- Admin Panel: `http://localhost:8080/admin`
 
 ## License
 
-Private - All rights reserved
+Private project - All rights reserved

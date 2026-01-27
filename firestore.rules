@@ -15,14 +15,17 @@ service cloud.firestore {
         exists(/databases/$(database)/documents/admin_users/$(request.auth.uid));
     }
 
+    // Helper to check if user is admin by checking admin_users collection
+    // This is the primary method - checks if user document exists in admin_users
+
     /* -------------------------------
-       Admin Users
+       Admin Users Collection
     --------------------------------*/
     match /admin_users/{userId} {
       // Admin can read only their own record
       allow read: if isAuthenticated() && request.auth.uid == userId;
-
-      // No client-side writes
+      
+      // No client-side writes (all writes are server-side only)
       allow create, update, delete: if false;
     }
 
@@ -30,50 +33,103 @@ service cloud.firestore {
        Properties Collection
     --------------------------------*/
     match /properties/{propertyId} {
-
+      
       /*
-        PUBLIC:
-        - Can read ONLY active properties
-        ADMIN:
-        - Can read all properties
-        IMPORTANT:
-        - For public queries, MUST include: where("is_active", "==", true)
-        - Admins can read all properties regardless of is_active status
+        READ RULES:
+        - Public users: Can read ONLY active properties (is_active == true)
+        - Authenticated users: Can read all properties (including inactive)
+        - Admins: Can read all properties
+        
+        IMPORTANT FOR QUERIES:
+        - Public queries MUST include: where("is_active", "==", true)
+        - This rule checks resource.data.is_active for each document in the query
       */
-      allow read: if resource.data.is_active == true || isAdmin();
-
+      allow read: if resource.data.is_active == true 
+                  || isAuthenticated();
+      
       /*
-        ADMIN ONLY:
-        - Create / Update / Delete
+        WRITE RULES:
+        - Only admins can create, update, or delete properties
+        - All writes are validated server-side
+        - Note: Most writes happen server-side via Admin SDK, these rules are backup
       */
-      allow create, update, delete: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /* -------------------------------
-       Property Images (metadata only)
+       Property Images Collection
     --------------------------------*/
     match /property_images/{imageId} {
-      // Public read (image URLs)
+      
+      /*
+        READ RULES:
+        - Public read access (images are stored as base64 data URLs)
+        - Anyone can view property images
+      */
       allow read: if true;
-
-      // Only admin can write metadata
-      allow create, update, delete: if isAdmin();
+      
+      /*
+        WRITE RULES:
+        - Only admins can create, update, or delete image metadata
+        - Image data is validated server-side (max 15KB per image)
+        - Note: Most writes happen server-side via Admin SDK, these rules are backup
+      */
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /* -------------------------------
-       Property Types
+       Property Types Collection
     --------------------------------*/
     match /property_types/{typeId} {
+      
+      /*
+        READ RULES:
+        - Public read access (property types are reference data)
+        - Anyone can view property types
+      */
       allow read: if true;
-      allow write: if false;
+      
+      /*
+        WRITE RULES:
+        - No client-side writes (all writes are server-side only)
+        - Types are managed through admin panel backend
+      */
+      allow create, update, delete: if false;
     }
 
     /* -------------------------------
-       Locations
+       Locations Collection
     --------------------------------*/
     match /locations/{locationId} {
+      
+      /*
+        READ RULES:
+        - Public read access (locations are reference data)
+        - Anyone can view locations
+      */
       allow read: if true;
-      allow write: if false;
+      
+      /*
+        WRITE RULES:
+        - No client-side writes (all writes are server-side only)
+        - Locations are managed through admin panel backend
+      */
+      allow create, update, delete: if false;
+    }
+
+    /* -------------------------------
+       Settings Collection (if exists)
+    --------------------------------*/
+    match /settings/{settingId} {
+      // Public read for settings
+      allow read: if true;
+      
+      // Only admins can update settings
+      allow create, update, delete: if isAdmin();
     }
   }
 }

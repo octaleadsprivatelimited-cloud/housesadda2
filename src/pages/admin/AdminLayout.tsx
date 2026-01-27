@@ -57,6 +57,7 @@ const AdminLayout = () => {
   const [adminName, setAdminName] = useState('Sreekanth');
 
   useEffect(() => {
+    // Optimize auth check - make it synchronous and fast
     const checkAuth = () => {
       try {
         const session = localStorage.getItem('adminSession');
@@ -81,20 +82,23 @@ const AdminLayout = () => {
           }
         }
         
-        // Not authenticated - redirect to login
+        // Not authenticated - redirect to login immediately
         setIsAuthenticated(false);
         setIsCheckingAuth(false);
-        if (location.pathname !== '/admin' && location.pathname !== '/admin/') {
-          navigate('/admin', { replace: true });
-        }
+        // Redirect to login page
+        navigate('/admin', { replace: true });
       } catch (error) {
         console.error('Auth check error:', error);
         setIsCheckingAuth(false);
         setIsAuthenticated(false);
-        navigate('/admin', { replace: true });
+        // Only redirect if not already on login page
+        if (location.pathname !== '/admin' && !location.pathname.startsWith('/admin/login')) {
+          navigate('/admin', { replace: true });
+        }
       }
     };
 
+    // Run auth check immediately (no async operations)
     checkAuth();
   }, [navigate, location.pathname]);
 

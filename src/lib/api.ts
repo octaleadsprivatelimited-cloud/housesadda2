@@ -35,8 +35,8 @@ const getAuthToken = (): string | null => {
   return null;
 };
 
-// Helper function for API requests
-const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
+// Helper function for API requests with timeout
+const apiRequest = async (endpoint: string, options: RequestInit = {}, timeout: number = 30000) => {
   const token = getAuthToken();
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
@@ -48,25 +48,37 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
   }
 
   try {
-    console.log('🌐 API Request:', {
-      url: `${API_BASE_URL}${endpoint}`,
-      method: options.method || 'GET',
-      headers: Object.keys(headers),
-      hasBody: !!options.body,
-      bodyPreview: options.body ? String(options.body).substring(0, 100) : 'none'
-    });
+    // Only log in development
+    if (import.meta.env.DEV) {
+      console.log('🌐 API Request:', {
+        url: `${API_BASE_URL}${endpoint}`,
+        method: options.method || 'GET',
+        headers: Object.keys(headers),
+        hasBody: !!options.body,
+      });
+    }
+
+    // Create abort controller for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
 
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
       headers,
+      signal: controller.signal,
     });
 
-    console.log('📥 API Response:', {
-      status: response.status,
-      statusText: response.statusText,
-      contentType: response.headers.get('content-type'),
-      ok: response.ok
-    });
+    clearTimeout(timeoutId);
+
+    // Only log in development
+    if (import.meta.env.DEV) {
+      console.log('📥 API Response:', {
+        status: response.status,
+        statusText: response.statusText,
+        contentType: response.headers.get('content-type'),
+        ok: response.ok
+      });
+    }
 
     // Handle non-JSON responses
     let data;
@@ -108,21 +120,31 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
 
     return data;
   } catch (error: any) {
+    // Handle timeout/abort errors
+    if (error.name === 'AbortError') {
+      const timeoutError = new Error('Request timeout. The server took too long to respond.');
+      (timeoutError as any).error = timeoutError.message;
+      (timeoutError as any).status = 408;
+      throw timeoutError;
+    }
+    
     // If it's already our custom error, re-throw it
     if (error.error || error.message) {
       throw error;
     }
     
     // Handle network errors
-    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+    if (error.name === 'TypeError' && (error.message.includes('fetch') || error.message.includes('Failed to fetch'))) {
       const networkError = new Error('Cannot connect to server. Make sure the backend is running on port 3001');
       (networkError as any).error = networkError.message;
+      (networkError as any).status = 0;
       throw networkError;
     }
     
     // Otherwise, create a user-friendly error
     const friendlyError = new Error(error.message || 'Network error. Please check your connection.');
     (friendlyError as any).error = friendlyError.message;
+    (friendlyError as any).status = error.status || 500;
     throw friendlyError;
   }
 };
