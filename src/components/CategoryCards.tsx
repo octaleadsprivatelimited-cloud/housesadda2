@@ -29,7 +29,7 @@ export function CategoryCards() {
   const loadCategories = async () => {
     try {
       setIsLoading(true);
-      const response = await propertiesAPI.getAll({ active: true, limit: 100 });
+      const response = await propertiesAPI.getAll({ active: true, limit: 50, skipImages: true });
       
       // Handle both old format (array) and new format (object with pagination)
       const properties = Array.isArray(response) 

@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Link } from 'react-router-dom';
 import { MapPin, Image as ImageIcon, Phone, MessageCircle, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -24,7 +25,7 @@ interface PropertyCardProps {
   property: Property;
 }
 
-export function PropertyCard({ property }: PropertyCardProps) {
+export const PropertyCard = memo(function PropertyCard({ property }: PropertyCardProps) {
   const formatPrice = (price: number) => {
     if (price >= 10000000) {
       return `₹${(price / 10000000).toFixed(2)} Cr`;
@@ -44,6 +45,9 @@ export function PropertyCard({ property }: PropertyCardProps) {
         <img
           src={property.image || 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=600&h=400&fit=crop&q=80'}
           alt={property.title}
+          loading="lazy"
+          decoding="async"
+          fetchPriority="low"
           onError={(e) => {
             // Fallback if image fails to load
             const target = e.target as HTMLImageElement;
@@ -119,4 +123,4 @@ export function PropertyCard({ property }: PropertyCardProps) {
       </div>
     </div>
   );
-}
+});

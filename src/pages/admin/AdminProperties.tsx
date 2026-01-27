@@ -305,7 +305,8 @@ const AdminProperties = () => {
                         <div className="min-w-0">
                           <p className="font-medium text-gray-800 text-sm truncate max-w-[200px]">{property.title}</p>
                           <p className="text-xs text-gray-400">
-                            {property.bedrooms > 0 && `${property.bedrooms} BHK • `}{property.sqft > 0 && `${property.sqft} sqft`}
+                            <span className="font-mono font-semibold text-blue-600 mr-1">{property.id}</span>
+                            {property.bedrooms > 0 && `• ${property.bedrooms} BHK`} {property.sqft > 0 && `• ${property.sqft} sqft`}
                           </p>
                         </div>
                       </div>

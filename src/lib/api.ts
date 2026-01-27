@@ -35,8 +35,39 @@ const getAuthToken = (): string | null => {
   return null;
 };
 
-// Helper function for API requests with timeout
+// Simple in-memory cache for GET requests (5 minutes TTL)
+const requestCache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+const getCacheKey = (endpoint: string, options: RequestInit) => {
+  return `${options.method || 'GET'}:${endpoint}:${JSON.stringify(options.body || {})}`;
+};
+
+const getCachedResponse = (key: string) => {
+  const cached = requestCache.get(key);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data;
+  }
+  if (cached) {
+    requestCache.delete(key); // Remove expired cache
+  }
+  return null;
+};
+
+// Helper function for API requests with timeout and caching
 const apiRequest = async (endpoint: string, options: RequestInit = {}, timeout: number = 30000) => {
+  // Use cache for GET requests only
+  const isGetRequest = !options.method || options.method === 'GET';
+  const cacheKey = isGetRequest ? getCacheKey(endpoint, options) : null;
+  
+  if (cacheKey) {
+    const cached = getCachedResponse(cacheKey);
+    if (cached) {
+      console.log('📦 Using cached response for:', endpoint);
+      return cached;
+    }
+  }
+
   const token = getAuthToken();
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
@@ -116,6 +147,19 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}, timeout: 
       (error as any).status = response.status;
       (error as any).responseData = data;
       throw error;
+    }
+
+    // Cache successful GET responses
+    if (cacheKey && response.ok) {
+      requestCache.set(cacheKey, {
+        data,
+        timestamp: Date.now()
+      });
+      // Limit cache size to prevent memory issues
+      if (requestCache.size > 50) {
+        const firstKey = requestCache.keys().next().value;
+        requestCache.delete(firstKey);
+      }
     }
 
     return data;

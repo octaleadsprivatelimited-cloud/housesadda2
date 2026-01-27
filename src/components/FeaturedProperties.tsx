@@ -17,7 +17,7 @@ export function FeaturedProperties() {
   const loadFeaturedProperties = async () => {
     try {
       setIsLoading(true);
-      const response = await propertiesAPI.getAll({ featured: true, active: true, limit: 10, skipImages: false });
+      const response = await propertiesAPI.getAll({ featured: true, active: true, limit: 5, skipImages: false });
       
       // Handle both old format (array) and new format (object with pagination)
       const data = Array.isArray(response) ? response : (response.properties || response || []);
