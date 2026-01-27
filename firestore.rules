@@ -1,77 +1,79 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper function to check if user is authenticated
+
+    /* -------------------------------
+       Helper Functions
+    --------------------------------*/
+
     function isAuthenticated() {
       return request.auth != null;
     }
-    
-    // Helper function to validate image size (max 15KB with margin)
-    function validateImageData(imageData) {
-      // Check if image_data exists and is a string
-      return imageData is string && 
-             imageData.size() <= 15360; // 15KB in bytes (15 * 1024)
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/admin_users/$(request.auth.uid));
     }
-    
-    // Helper function to validate content size
-    function validateContent(content) {
-      return content is string && content.size() <= 10000; // Max 10KB for descriptions
-    }
-    
-    // Admin users collection - only server can write
+
+    /* -------------------------------
+       Admin Users
+    --------------------------------*/
     match /admin_users/{userId} {
-      allow read: if false; // No client-side reads
-      allow write: if false; // Only server-side writes
+      // Admin can read only their own record
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+
+      // No client-side writes
+      allow create, update, delete: if false;
     }
-    
-    // Properties collection
+
+    /* -------------------------------
+       Properties Collection
+    --------------------------------*/
     match /properties/{propertyId} {
-      // Allow public reads for active properties
-      allow read: if resource.data.is_active == true || request.auth != null;
-      
-      // Only authenticated admin can write (handled by server, but rules as backup)
-      allow create: if false; // Server-side only
-      allow update: if false; // Server-side only
-      allow delete: if false; // Server-side only
-      
-      // Validate data structure
-      function isValidProperty() {
-        return request.resource.data.keys().hasAll(['title', 'price', 'city']) &&
-               request.resource.data.title is string &&
-               request.resource.data.title.size() > 0 &&
-               request.resource.data.title.size() <= 255 &&
-               request.resource.data.price is number &&
-               request.resource.data.price >= 0 &&
-               (!('description' in request.resource.data) || validateContent(request.resource.data.description));
-      }
+
+      /*
+        PUBLIC:
+        - Can read ONLY active properties
+        ADMIN:
+        - Can read all properties
+        IMPORTANT:
+        - For public queries, MUST include: where("is_active", "==", true)
+        - Admins can read all properties regardless of is_active status
+      */
+      allow read: if resource.data.is_active == true || isAdmin();
+
+      /*
+        ADMIN ONLY:
+        - Create / Update / Delete
+      */
+      allow create, update, delete: if isAdmin();
     }
-    
-    // Property images collection
+
+    /* -------------------------------
+       Property Images (metadata only)
+    --------------------------------*/
     match /property_images/{imageId} {
-      // Allow public reads
+      // Public read (image URLs)
       allow read: if true;
-      
-      // Only server can write (validation happens server-side)
-      allow create: if false; // Server-side only - validation enforced in backend
-      allow update: if false; // Server-side only
-      allow delete: if false; // Server-side only
-      
-      // Note: Image size validation is enforced server-side before writing
-      // Firestore rules cannot easily validate base64 string sizes
-      // Server-side validation ensures images are ≤ 15KB before storing
+
+      // Only admin can write metadata
+      allow create, update, delete: if isAdmin();
     }
-    
-    // Property types collection
+
+    /* -------------------------------
+       Property Types
+    --------------------------------*/
     match /property_types/{typeId} {
       allow read: if true;
-      allow write: if false; // Server-side only
+      allow write: if false;
     }
-    
-    // Locations collection
+
+    /* -------------------------------
+       Locations
+    --------------------------------*/
     match /locations/{locationId} {
       allow read: if true;
-      allow write: if false; // Server-side only
+      allow write: if false;
     }
   }
 }
