@@ -4,14 +4,32 @@ import { Footer } from '@/components/Footer';
 import { HeroSection } from '@/components/HeroSection';
 import { Loader2 } from 'lucide-react';
 
-// Lazy load heavy components for faster initial load
-const FeaturedPropertiesTabs = lazy(() => import('@/components/FeaturedPropertiesTabs').then(m => ({ default: m.FeaturedPropertiesTabs })));
-const CategoryCards = lazy(() => import('@/components/CategoryCards').then(m => ({ default: m.CategoryCards })));
-const FeaturedProperties = lazy(() => import('@/components/FeaturedProperties').then(m => ({ default: m.FeaturedProperties })));
-const BrowseByLocality = lazy(() => import('@/components/BrowseByLocality').then(m => ({ default: m.BrowseByLocality })));
-const LatestProperties = lazy(() => import('@/components/LatestProperties').then(m => ({ default: m.LatestProperties })));
-const WhatsAppButton = lazy(() => import('@/components/WhatsAppButton').then(m => ({ default: m.WhatsAppButton })));
-const MobileActionBar = lazy(() => import('@/components/MobileActionBar').then(m => ({ default: m.MobileActionBar })));
+// Lazy load heavy components for faster initial load with error handling
+const lazyWithRetry = (componentImport: () => Promise<any>) => {
+  return lazy(async () => {
+    try {
+      return await componentImport();
+    } catch (error) {
+      console.error('Failed to load component:', error);
+      // Retry once after a short delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      try {
+        return await componentImport();
+      } catch (retryError) {
+        console.error('Retry failed:', retryError);
+        throw retryError;
+      }
+    }
+  });
+};
+
+const FeaturedPropertiesTabs = lazyWithRetry(() => import('@/components/FeaturedPropertiesTabs').then(m => ({ default: m.FeaturedPropertiesTabs })));
+const CategoryCards = lazyWithRetry(() => import('@/components/CategoryCards').then(m => ({ default: m.CategoryCards })));
+const FeaturedProperties = lazyWithRetry(() => import('@/components/FeaturedProperties').then(m => ({ default: m.FeaturedProperties })));
+const BrowseByLocality = lazyWithRetry(() => import('@/components/BrowseByLocality').then(m => ({ default: m.BrowseByLocality })));
+const LatestProperties = lazyWithRetry(() => import('@/components/LatestProperties').then(m => ({ default: m.LatestProperties })));
+const WhatsAppButton = lazyWithRetry(() => import('@/components/WhatsAppButton').then(m => ({ default: m.WhatsAppButton })));
+const MobileActionBar = lazyWithRetry(() => import('@/components/MobileActionBar').then(m => ({ default: m.MobileActionBar })));
 
 // Loading skeleton component
 const SectionSkeleton = () => (

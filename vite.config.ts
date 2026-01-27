@@ -45,6 +45,16 @@ export default defineConfig({
     assetsDir: 'assets',
     sourcemap: false, // Disable sourcemaps in production for smaller bundle
     minify: 'esbuild', // Use esbuild (faster and built-in) instead of terser
+    // Ensure chunks are properly named for better caching
+    rollupOptions: {
+      ...rollupOptions,
+      output: {
+        ...rollupOptions.output,
+        chunkFileNames: 'assets/js/[name]-[hash].js',
+        entryFileNames: 'assets/js/[name]-[hash].js',
+        assetFileNames: 'assets/[ext]/[name]-[hash].[ext]',
+      },
+    },
   },
   optimizeDeps: {
     // Pre-bundle dependencies for faster dev server

@@ -28,7 +28,15 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    // Log error for debugging (only in development or if console is available)
+    if (typeof console !== 'undefined' && console.error) {
+      console.error('ErrorBoundary caught an error:', error, errorInfo);
+    }
+    
+    // Optionally send to error tracking service in production
+    if (process.env.NODE_ENV === 'production') {
+      // You can add error tracking here (e.g., Sentry, LogRocket, etc.)
+    }
   }
 
   handleReset = () => {
