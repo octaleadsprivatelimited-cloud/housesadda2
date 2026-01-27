@@ -32,7 +32,7 @@ export default defineConfig({
           if (id.includes('node_modules/firebase')) {
             return 'firebase-vendor';
           }
-          // Large utilities
+          // All other node_modules
           if (id.includes('node_modules')) {
             return 'vendor';
           }
