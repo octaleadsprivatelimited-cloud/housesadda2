@@ -289,7 +289,7 @@ const AdminProperties = () => {
                               alt="" 
                               className="w-full h-full object-cover"
                                      loading="eager"
-                              decoding="async"
+                              decoding="sync"
                               onError={(e) => {
                                 // Replace with placeholder on error
                                 e.currentTarget.style.display = 'none';
