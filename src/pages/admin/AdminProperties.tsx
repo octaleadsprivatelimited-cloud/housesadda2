@@ -26,16 +26,31 @@ const AdminProperties = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [transactionFilter, setTransactionFilter] = useState<string>('All');
   const [statusFilter, setStatusFilter] = useState<string>(searchParams.get('filter') || 'all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalProperties, setTotalProperties] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const propertiesPerPage = 50; // Reduced from 500 for better performance
 
   useEffect(() => {
-    loadProperties();
-  }, [transactionFilter]);
+    setCurrentPage(1); // Reset to page 1 when filters change
+    loadProperties(1);
+  }, [transactionFilter, statusFilter]);
+
+  useEffect(() => {
+    // Debounce search to avoid too many API calls
+    const timer = setTimeout(() => {
+      setCurrentPage(1);
+      loadProperties(1);
+    }, 500); // Increased debounce time
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Memoize filtered properties to avoid unnecessary re-renders
+  // Note: Most filtering is now done on backend, but we keep client-side search
   const filteredProperties = useMemo(() => {
     let filtered = properties;
 
-    // Apply search filter
+    // Apply search filter (client-side for instant feedback)
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(p => 
@@ -45,28 +60,51 @@ const AdminProperties = () => {
       );
     }
 
-    // Apply status filter
-    if (statusFilter === 'featured') {
-      filtered = filtered.filter(p => p.is_featured);
-    } else if (statusFilter === 'active') {
-      filtered = filtered.filter(p => p.is_active);
-    } else if (statusFilter === 'inactive') {
-      filtered = filtered.filter(p => !p.is_active);
-    }
-
     return filtered;
-  }, [properties, searchQuery, statusFilter]);
+  }, [properties, searchQuery]);
 
-  const loadProperties = async () => {
+  const loadProperties = async (page: number = 1) => {
     try {
       setIsLoading(true);
-      const params: any = {};
+      const offset = (page - 1) * propertiesPerPage;
+      const params: any = { 
+        limit: propertiesPerPage,
+        offset: offset,
+        skipImages: true // Skip images for list view to improve performance
+      };
       if (transactionFilter !== 'All') {
         params.transactionType = transactionFilter;
       }
-      const data = await propertiesAPI.getAll(params);
+      // Apply status filter on backend if possible
+      if (statusFilter === 'featured') {
+        params.featured = true;
+      } else if (statusFilter === 'active') {
+        params.active = true;
+      } else if (statusFilter === 'inactive') {
+        params.active = false;
+      }
+      // Pass search query to backend for server-side search
+      if (searchQuery.trim()) {
+        params.search = searchQuery.trim();
+      }
+      const response = await propertiesAPI.getAll(params);
+      // Handle both array response and object with properties array
+      const data = Array.isArray(response) ? response : (response.properties || response || []);
+      
+      // Always replace properties (server-side pagination)
       setProperties(data);
+      
+      // Update pagination info
+      if (response.pagination) {
+        setTotalProperties(response.pagination.total || data.length);
+        setHasMore(response.pagination.hasMore || false);
+      } else {
+        // If no pagination info, estimate based on data length
+        setTotalProperties(data.length);
+        setHasMore(data.length === propertiesPerPage);
+      }
     } catch (error: any) {
+      console.error('Error loading properties:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to load properties",
@@ -117,10 +155,43 @@ const AdminProperties = () => {
     }
   };
 
-  if (isLoading) {
+  if (isLoading && properties.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="space-y-5">
+        {/* Header Skeleton */}
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="h-8 w-48 bg-gray-200 rounded animate-pulse mb-2"></div>
+            <div className="h-4 w-32 bg-gray-200 rounded animate-pulse"></div>
+          </div>
+          <div className="h-10 w-32 bg-gray-200 rounded animate-pulse"></div>
+        </div>
+        
+        {/* Filters Skeleton */}
+        <div className="flex gap-3">
+          <div className="h-10 flex-1 bg-gray-200 rounded animate-pulse"></div>
+          <div className="h-10 w-32 bg-gray-200 rounded animate-pulse"></div>
+          <div className="h-10 w-32 bg-gray-200 rounded animate-pulse"></div>
+        </div>
+        
+        {/* Table Skeleton */}
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="p-4 space-y-3">
+            {[...Array(10)].map((_, i) => (
+              <div key={i} className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-gray-200 rounded animate-pulse"></div>
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 w-3/4 bg-gray-200 rounded animate-pulse"></div>
+                  <div className="h-3 w-1/2 bg-gray-200 rounded animate-pulse"></div>
+                </div>
+                <div className="h-4 w-20 bg-gray-200 rounded animate-pulse"></div>
+                <div className="h-6 w-16 bg-gray-200 rounded animate-pulse"></div>
+                <div className="h-6 w-12 bg-gray-200 rounded animate-pulse"></div>
+                <div className="h-8 w-8 bg-gray-200 rounded animate-pulse"></div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
@@ -183,7 +254,12 @@ const AdminProperties = () => {
       </div>
 
       {/* Properties Table */}
-      {filteredProperties.length > 0 ? (
+      {isLoading && properties.length > 0 ? (
+        <div className="bg-white rounded-lg border border-gray-200 p-4 text-center">
+          <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" />
+          <p className="text-sm text-gray-500 mt-2">Loading more properties...</p>
+        </div>
+      ) : filteredProperties.length > 0 ? (
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -208,8 +284,19 @@ const AdminProperties = () => {
                       <div className="flex items-center gap-3">
                         <div className="w-12 h-12 rounded-lg bg-gray-100 flex-shrink-0 overflow-hidden">
                           {property.image ? (
-                            <img src={property.image} alt="" className="w-full h-full object-cover" />
-                          ) : (
+                            <img 
+                              src={property.image} 
+                              alt="" 
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                              decoding="async"
+                              onError={(e) => {
+                                // Replace with placeholder on error
+                                e.currentTarget.style.display = 'none';
+                              }}
+                            />
+                          ) : null}
+                          {!property.image && (
                             <div className="w-full h-full flex items-center justify-center">
                               <Building2 className="h-5 w-5 text-gray-300" />
                             </div>
@@ -243,18 +330,30 @@ const AdminProperties = () => {
                     </td>
                     <td className="px-4 py-3 text-center">
                       <button 
-                        onClick={() => toggleFeatured(String(property.id), property.isFeatured)}
+                        onClick={() => {
+                          const isFeatured = property.isFeatured === true || property.is_featured === true || property.isFeatured === 'true' || property.is_featured === 'true';
+                          toggleFeatured(String(property.id), isFeatured);
+                        }}
                         className={`p-1 rounded transition-colors ${
-                          property.isFeatured ? 'text-amber-500' : 'text-gray-300 hover:text-amber-400'
+                          (property.isFeatured === true || property.is_featured === true || property.isFeatured === 'true' || property.is_featured === 'true') 
+                            ? 'text-amber-500' 
+                            : 'text-gray-300 hover:text-amber-400'
                         }`}
                       >
-                        <Star className={`h-5 w-5 ${property.isFeatured ? 'fill-current' : ''}`} />
+                        <Star className={`h-5 w-5 ${
+                          (property.isFeatured === true || property.is_featured === true || property.isFeatured === 'true' || property.is_featured === 'true') 
+                            ? 'fill-current' 
+                            : ''
+                        }`} />
                       </button>
                     </td>
                     <td className="px-4 py-3 text-center">
                       <Switch
-                        checked={property.isActive}
-                        onCheckedChange={() => toggleActive(String(property.id), property.isActive)}
+                        checked={property.isActive === true || property.is_active === true || property.isActive === 'true' || property.is_active === 'true'}
+                        onCheckedChange={() => {
+                          const isActive = property.isActive === true || property.is_active === true || property.isActive === 'true' || property.is_active === 'true';
+                          toggleActive(String(property.id), isActive);
+                        }}
                         className="scale-90"
                       />
                     </td>
@@ -301,6 +400,48 @@ const AdminProperties = () => {
               Add Property
             </Button>
           </Link>
+        </div>
+      )}
+
+      {/* Pagination Controls */}
+      {filteredProperties.length > 0 && (
+        <div className="flex items-center justify-between bg-white rounded-lg border border-gray-200 px-4 py-3">
+          <div className="text-sm text-gray-600">
+            Showing {((currentPage - 1) * propertiesPerPage) + 1} to {Math.min(currentPage * propertiesPerPage, totalProperties)} of {totalProperties} properties
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (currentPage > 1) {
+                  const newPage = currentPage - 1;
+                  setCurrentPage(newPage);
+                  loadProperties(newPage);
+                }
+              }}
+              disabled={currentPage === 1 || isLoading}
+            >
+              Previous
+            </Button>
+            <span className="text-sm text-gray-600 px-2">
+              Page {currentPage}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (hasMore) {
+                  const newPage = currentPage + 1;
+                  setCurrentPage(newPage);
+                  loadProperties(newPage);
+                }
+              }}
+              disabled={!hasMore || isLoading}
+            >
+              Next
+            </Button>
+          </div>
         </div>
       )}
     </div>

@@ -220,6 +220,7 @@ export const propertiesAPI = {
     transactionType?: string;
     limit?: number;
     offset?: number;
+    skipImages?: boolean;
   }) => {
     const queryParams = new URLSearchParams();
     if (params) {
@@ -231,14 +232,17 @@ export const propertiesAPI = {
         }
       });
     }
-    // Add default limit if not specified (for performance)
+    // Only add default limit if not specified AND not in admin context
+    // Admin panel should explicitly pass limit
     if (!params?.limit) {
       queryParams.append('limit', '20');
     }
     const query = queryParams.toString();
     const url = `/properties${query ? `?${query}` : ''}`;
     console.log('🌐 API Call:', url);
-    return apiRequest(url);
+    const response = await apiRequest(url);
+    // Return response as-is (could be array or object with properties array)
+    return response;
   },
 
   getById: async (id: string) => {

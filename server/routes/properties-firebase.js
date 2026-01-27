@@ -282,9 +282,10 @@ async function formatProperty(propDoc) {
 // Get all properties
 router.get('/', async (req, res) => {
   try {
-    const { search, type, city, area, featured, active, transactionType, limit, offset } = req.query;
+    const { search, type, city, area, featured, active, transactionType, limit, offset, skipImages } = req.query;
     
     console.log('📥 GET /properties - Raw query:', req.query);
+    const shouldSkipImages = skipImages === 'true' || skipImages === true;
 
     let query = db.collection('properties');
     
@@ -337,6 +338,18 @@ router.get('/', async (req, res) => {
     // Order by created_at descending (only if we're not filtering by active to avoid index requirement)
     if (!needsActiveFilter) {
       query = query.orderBy('created_at', 'desc');
+      
+      // CRITICAL OPTIMIZATION: Apply limit at Firestore level when possible (much faster!)
+      const defaultLimit = 20;
+      const limitNum = limit ? parseInt(limit) : defaultLimit;
+      const offsetNum = offset ? parseInt(offset) : 0;
+      
+      // Apply limit + offset at Firestore level for better performance
+      if (limitNum > 0) {
+        // Firestore doesn't support offset directly, but we can use startAfter for pagination
+        // For now, just apply limit to reduce data transfer
+        query = query.limit(limitNum + offsetNum); // Fetch enough to cover offset
+      }
     }
 
     const snapshot = await query.get();
@@ -393,7 +406,10 @@ router.get('/', async (req, res) => {
     const offsetNum = offset ? parseInt(offset) : 0;
     
     // Slice properties BEFORE fetching images (huge performance gain)
-    const paginatedProperties = properties.slice(offsetNum, offsetNum + limitNum);
+    // If we already applied limit at Firestore level, we still need to apply offset
+    const paginatedProperties = needsActiveFilter 
+      ? properties.slice(offsetNum, offsetNum + limitNum)
+      : properties.slice(offsetNum, offsetNum + limitNum); // Still need offset handling
     console.log(`📊 Paginating: Showing ${paginatedProperties.length} of ${properties.length} properties (limit: ${limitNum}, offset: ${offsetNum})`);
 
     // OPTIMIZATION: Batch fetch all related data upfront instead of per-property queries
@@ -432,8 +448,9 @@ router.get('/', async (req, res) => {
     });
     
     // 4. OPTIMIZED: Fetch ONLY FIRST image per property for list view (much faster!)
+    // SKIP images entirely if skipImages flag is set (for admin list views)
     const imagesMap = {};
-    if (propertyIds.length > 0) {
+    if (!shouldSkipImages && propertyIds.length > 0) {
       try {
         // Fetch images in batches (Firestore 'in' query limit is 10)
         const imageBatches = [];
@@ -490,6 +507,8 @@ router.get('/', async (req, res) => {
         console.warn('⚠️ Error batch fetching images:', imageError.message);
         // Continue without images - they'll just be empty
       }
+    } else if (shouldSkipImages) {
+      console.log('⏭️ Skipping image fetch (skipImages=true) for faster list view');
     }
     
     // 5. Format properties using cached data (no additional queries!)

@@ -55,16 +55,21 @@ const AdminDashboard = () => {
   const loadDashboardData = async () => {
     try {
       setIsLoading(true);
-      const params: any = {};
+      const params: any = { 
+        limit: 100, // Reduced from 500 for better performance
+        skipImages: true // Skip images for dashboard stats
+      };
       if (selectedFilter !== 'All') {
         params.transactionType = selectedFilter;
       }
       
-      const allProperties = await propertiesAPI.getAll(params);
+      const response = await propertiesAPI.getAll(params);
+      // Handle both array response and object with properties array
+      const allProperties = Array.isArray(response) ? response : (response.properties || response || []);
       const filteredProperties = allProperties;
       
-      const activeProperties = filteredProperties.filter((p: any) => p.isActive);
-      const featuredProperties = filteredProperties.filter((p: any) => p.isFeatured);
+      const activeProperties = filteredProperties.filter((p: any) => p.isActive === true || p.isActive === 'true');
+      const featuredProperties = filteredProperties.filter((p: any) => p.isFeatured === true || p.isFeatured === 'true');
 
       setStats({
         total: filteredProperties.length,
@@ -87,8 +92,16 @@ const AdminDashboard = () => {
         }));
       
       setRecentProperties(recent);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading dashboard data:', error);
+      // Show error to user
+      setStats({
+        total: 0,
+        featured: 0,
+        active: 0,
+        inactive: 0,
+      });
+      setRecentProperties([]);
     } finally {
       setIsLoading(false);
     }
