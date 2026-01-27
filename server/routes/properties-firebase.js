@@ -195,10 +195,30 @@ router.get('/', async (req, res) => {
 
     if (area || city) {
       let locationQuery = db.collection('locations');
-      if (area) locationQuery = locationQuery.where('name', '==', area);
-      if (city) locationQuery = locationQuery.where('city', '==', city);
-      const locationSnapshot = await locationQuery.limit(1).get();
-      if (!locationSnapshot.empty) locationId = locationSnapshot.docs[0].id;
+      if (area) {
+        // Try exact match first
+        locationQuery = locationQuery.where('name', '==', area);
+        if (city) {
+          locationQuery = locationQuery.where('city', '==', city);
+        }
+        const locationSnapshot = await locationQuery.limit(1).get();
+        if (!locationSnapshot.empty) {
+          locationId = locationSnapshot.docs[0].id;
+        } else if (area && !city) {
+          // If exact match fails and no city specified, try case-insensitive search
+          // Firestore doesn't support case-insensitive, so we'll fetch and filter
+          const allLocations = await db.collection('locations').get();
+          const matched = allLocations.docs.find(doc => {
+            const locData = doc.data();
+            return locData.name && locData.name.toLowerCase() === area.toLowerCase();
+          });
+          if (matched) locationId = matched.id;
+        }
+      } else if (city) {
+        locationQuery = locationQuery.where('city', '==', city);
+        const locationSnapshot = await locationQuery.limit(1).get();
+        if (!locationSnapshot.empty) locationId = locationSnapshot.docs[0].id;
+      }
     }
 
     if (type) {

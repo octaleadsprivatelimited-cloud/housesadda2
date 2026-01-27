@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
 import { WhatsAppButton } from '@/components/WhatsAppButton';
@@ -20,7 +20,8 @@ import {
 } from 'lucide-react';
 
 const Properties = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [properties, setProperties] = useState<Property[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -186,6 +187,58 @@ const Properties = () => {
     else setSelectedType('All Types');
   }, [typeParam]);
 
+  // Update URL when filters change
+  const updateFilters = (newArea: string, newType: string, newBudget: any) => {
+    const params = new URLSearchParams(searchParams);
+    
+    // Update area
+    if (newArea && newArea !== 'All Areas') {
+      params.set('area', newArea);
+    } else {
+      params.delete('area');
+    }
+    
+    // Update type
+    if (newType && newType !== 'All Types') {
+      params.set('type', newType);
+    } else {
+      params.delete('type');
+    }
+    
+    // Update budget
+    if (newBudget && newBudget.value) {
+      params.set('budget', newBudget.value);
+    } else {
+      params.delete('budget');
+    }
+    
+    // Preserve intent/transactionType
+    if (intent) params.set('intent', intent);
+    if (transactionTypeParam) params.set('transactionType', transactionTypeParam);
+    if (searchQuery) params.set('search', searchQuery);
+    if (featuredParam) params.set('featured', featuredParam);
+    
+    setSearchParams(params, { replace: true });
+  };
+
+  // Handle area change
+  const handleAreaChange = (newArea: string) => {
+    setSelectedArea(newArea);
+    updateFilters(newArea, selectedType, selectedBudget);
+  };
+
+  // Handle type change
+  const handleTypeChange = (newType: string) => {
+    setSelectedType(newType);
+    updateFilters(selectedArea, newType, selectedBudget);
+  };
+
+  // Handle budget change
+  const handleBudgetChange = (newBudget: any) => {
+    setSelectedBudget(newBudget);
+    updateFilters(selectedArea, selectedType, newBudget);
+  };
+
   // Filter properties (only apply budget filter locally, rest is handled by API)
   const filteredProperties = properties.filter((property) => {
     // Budget filter (local only since API doesn't support it yet)
@@ -195,31 +248,19 @@ const Properties = () => {
       const min = minStr ? parseFloat(minStr) : 0;
       const max = maxStr ? parseFloat(maxStr) : Infinity;
       budgetMatch = property.price >= min && property.price <= max;
-    } else {
+    } else if (selectedBudget && selectedBudget.value) {
       budgetMatch = property.price >= selectedBudget.min && property.price <= selectedBudget.max;
     }
     
-    // Local area filter (in case of additional filtering from dropdown)
-    const areaMatch = selectedArea === 'All Areas' || !areaParam || property.area === selectedArea || property.area === areaParam;
-    
-    // Local type filter
-    const typeMatch = selectedType === 'All Types' || !typeParam || property.type === selectedType || property.type === typeParam;
-    
-    // Local search filter for title/description
-    let searchMatch = true;
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      searchMatch = 
-        property.title.toLowerCase().includes(query) ||
-        property.area?.toLowerCase().includes(query) ||
-        property.city?.toLowerCase().includes(query) ||
-        property.type?.toLowerCase().includes(query);
-    }
-    
-    return budgetMatch && areaMatch && typeMatch && searchMatch;
+    return budgetMatch;
   });
 
   const clearFilters = () => {
+    const params = new URLSearchParams();
+    // Preserve intent if present
+    if (intent) params.set('intent', intent);
+    if (transactionTypeParam) params.set('transactionType', transactionTypeParam);
+    setSearchParams(params, { replace: true });
     setSelectedArea('All Areas');
     setSelectedType('All Types');
     setSelectedBudget(budgetRanges[0]);
@@ -274,7 +315,7 @@ const Properties = () => {
                 <div className="relative">
                   <select
                     value={selectedArea}
-                    onChange={(e) => setSelectedArea(e.target.value)}
+                    onChange={(e) => handleAreaChange(e.target.value)}
                     className="appearance-none bg-card border border-border rounded-xl px-4 py-2.5 pr-10 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
                   >
                     {areas.map((area) => (
@@ -288,7 +329,7 @@ const Properties = () => {
                 <div className="relative">
                   <select
                     value={selectedType}
-                    onChange={(e) => setSelectedType(e.target.value)}
+                    onChange={(e) => handleTypeChange(e.target.value)}
                     className="appearance-none bg-card border border-border rounded-xl px-4 py-2.5 pr-10 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
                   >
                     {propertyTypes.map((type) => (
@@ -302,7 +343,7 @@ const Properties = () => {
                 <div className="relative">
                   <select
                     value={selectedBudget.label}
-                    onChange={(e) => setSelectedBudget(budgetRanges.find(b => b.label === e.target.value) || budgetRanges[0])}
+                    onChange={(e) => handleBudgetChange(budgetRanges.find(b => b.label === e.target.value) || budgetRanges[0])}
                     className="appearance-none bg-card border border-border rounded-xl px-4 py-2.5 pr-10 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
                   >
                     {budgetRanges.map((budget) => (
@@ -406,7 +447,7 @@ const Properties = () => {
                   <div className="relative">
                     <select
                       value={selectedArea}
-                      onChange={(e) => setSelectedArea(e.target.value)}
+                      onChange={(e) => handleAreaChange(e.target.value)}
                       className="w-full appearance-none bg-secondary rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-primary"
                     >
                       {areas.map((area) => (
@@ -423,7 +464,7 @@ const Properties = () => {
                   <div className="relative">
                     <select
                       value={selectedType}
-                      onChange={(e) => setSelectedType(e.target.value)}
+                      onChange={(e) => handleTypeChange(e.target.value)}
                       className="w-full appearance-none bg-secondary rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-primary"
                     >
                       {propertyTypes.map((type) => (
@@ -440,7 +481,7 @@ const Properties = () => {
                   <div className="relative">
                     <select
                       value={selectedBudget.label}
-                      onChange={(e) => setSelectedBudget(budgetRanges.find(b => b.label === e.target.value) || budgetRanges[0])}
+                      onChange={(e) => handleBudgetChange(budgetRanges.find(b => b.label === e.target.value) || budgetRanges[0])}
                       className="w-full appearance-none bg-secondary rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-primary"
                     >
                       {budgetRanges.map((budget) => (
