@@ -383,6 +383,205 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Search API endpoint - optimized for home page search filters
+// MUST be before /:id route to avoid route conflicts
+router.get('/search', async (req, res) => {
+  try {
+    const db = getDatabase();
+    const { 
+      transactionType, 
+      area, 
+      type, 
+      city,
+      budget, // Format: "min-max" or "min-" or "-max"
+      minPrice,
+      maxPrice,
+      limit = 20,
+      offset = 0,
+      skipImages = false
+    } = req.query;
+
+    const shouldSkipImages = skipImages === 'true' || skipImages === true;
+    const limitNum = Math.min(parseInt(limit) || 20, 100);
+    const offsetNum = parseInt(offset) || 0;
+
+    let query = db.collection('properties');
+
+    // Get location_id and type_id if filters provided
+    let locationId = null;
+    let typeId = null;
+
+    // Location lookup
+    if (area || city) {
+      let locationQuery = db.collection('locations');
+      if (area) {
+        locationQuery = locationQuery.where('name', '==', area);
+        if (city) {
+          locationQuery = locationQuery.where('city', '==', city);
+        }
+        const locationSnapshot = await locationQuery.limit(1).get();
+        if (!locationSnapshot.empty) {
+          locationId = locationSnapshot.docs[0].id;
+        } else if (area && !city) {
+          // Case-insensitive fallback
+          const allLocations = await db.collection('locations').get();
+          const matched = allLocations.docs.find(doc => {
+            const locData = doc.data();
+            return locData.name && locData.name.toLowerCase() === area.toLowerCase();
+          });
+          if (matched) locationId = matched.id;
+        }
+      } else if (city) {
+        locationQuery = locationQuery.where('city', '==', city);
+        const locationSnapshot = await locationQuery.limit(1).get();
+        if (!locationSnapshot.empty) locationId = locationSnapshot.docs[0].id;
+      }
+    }
+
+    // Type lookup
+    if (type) {
+      const typeSnapshot = await db.collection('property_types')
+        .where('name', '==', type)
+        .limit(1)
+        .get();
+      if (!typeSnapshot.empty) {
+        typeId = typeSnapshot.docs[0].id;
+      } else {
+        // Case-insensitive fallback
+        const allTypes = await db.collection('property_types').get();
+        const matched = allTypes.docs.find(doc => {
+          const typeData = doc.data();
+          return typeData.name && typeData.name.toLowerCase() === type.toLowerCase();
+        });
+        if (matched) typeId = matched.id;
+      }
+    }
+
+    // Apply Firestore filters
+    if (typeId) query = query.where('type_id', '==', typeId);
+    if (locationId) query = query.where('location_id', '==', locationId);
+    if (transactionType) query = query.where('transaction_type', '==', transactionType);
+    
+    // Only show active properties for public search
+    query = query.where('is_active', '==', true);
+
+    // Order and limit
+    query = query.orderBy('created_at', 'desc');
+    query = query.limit(limitNum + offsetNum);
+
+    const snapshot = await query.get();
+    let properties = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    // Parse budget range if provided
+    let parsedMinPrice = minPrice ? parseFloat(minPrice) : null;
+    let parsedMaxPrice = maxPrice ? parseFloat(maxPrice) : null;
+
+    if (budget && !parsedMinPrice && !parsedMaxPrice) {
+      // Parse budget string format: "min-max" or "min-" or "-max"
+      const budgetParts = budget.split('-');
+      if (budgetParts.length === 2) {
+        parsedMinPrice = budgetParts[0] ? parseFloat(budgetParts[0]) : 0;
+        parsedMaxPrice = budgetParts[1] ? parseFloat(budgetParts[1]) : Infinity;
+      } else if (budget.startsWith('-')) {
+        parsedMaxPrice = parseFloat(budget.substring(1));
+        parsedMinPrice = 0;
+      } else if (budget.endsWith('-')) {
+        parsedMinPrice = parseFloat(budget.replace('-', ''));
+        parsedMaxPrice = Infinity;
+      }
+    }
+
+    // Apply budget/price filter
+    if (parsedMinPrice !== null || parsedMaxPrice !== null) {
+      properties = properties.filter(prop => {
+        const price = parseFloat(prop.price) || 0;
+        if (parsedMinPrice !== null && parsedMaxPrice !== null) {
+          return price >= parsedMinPrice && price <= parsedMaxPrice;
+        } else if (parsedMinPrice !== null) {
+          return price >= parsedMinPrice;
+        } else if (parsedMaxPrice !== null) {
+          return price <= parsedMaxPrice;
+        }
+        return true;
+      });
+    }
+
+    // Apply pagination
+    const hasMore = properties.length > limitNum;
+    const paginatedProperties = properties.slice(offsetNum, offsetNum + limitNum);
+
+    // Batch fetch locations and types
+    const locationIds = [...new Set(paginatedProperties.map(p => p.location_id).filter(Boolean))];
+    const typeIds = [...new Set(paginatedProperties.map(p => p.type_id).filter(Boolean))];
+
+    const [locationDocs, typeDocs] = await Promise.all([
+      locationIds.length > 0 
+        ? Promise.all(locationIds.map(id => db.collection('locations').doc(id).get()))
+        : Promise.resolve([]),
+      typeIds.length > 0
+        ? Promise.all(typeIds.map(id => db.collection('property_types').doc(id).get()))
+        : Promise.resolve([])
+    ]);
+
+    const locationMap = {};
+    locationDocs.forEach(doc => {
+      if (doc.exists) locationMap[doc.id] = doc.data();
+    });
+
+    const typeMap = {};
+    typeDocs.forEach(doc => {
+      if (doc.exists) typeMap[doc.id] = doc.data();
+    });
+
+    // Format properties
+    const formattedProperties = [];
+    for (const prop of paginatedProperties) {
+      try {
+        const formatted = shouldSkipImages 
+          ? formatPropertyList(prop, locationMap, typeMap)
+          : await formatProperty(prop, db, shouldSkipImages);
+        formattedProperties.push(formatted);
+      } catch (error) {
+        console.error(`Error formatting property ${prop.id}:`, error);
+      }
+    }
+
+    res.json({
+      success: true,
+      properties: formattedProperties,
+      pagination: {
+        total: properties.length,
+        limit: limitNum,
+        offset: offsetNum,
+        hasMore: hasMore
+      },
+      filters: {
+        transactionType: transactionType || null,
+        area: area || null,
+        type: type || null,
+        city: city || null,
+        budget: budget || null,
+        minPrice: parsedMinPrice,
+        maxPrice: parsedMaxPrice === Infinity ? null : parsedMaxPrice
+      }
+    });
+  } catch (error) {
+    console.error('Search API error:', error);
+    if (error.message.includes('not initialized')) {
+      return res.status(503).json({
+        success: false,
+        error: 'Database not available',
+        message: error.message
+      });
+    }
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+});
+
 // Get single property (with all images)
 router.get('/:id', async (req, res) => {
   try {
