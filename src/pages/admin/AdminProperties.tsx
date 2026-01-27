@@ -288,7 +288,7 @@ const AdminProperties = () => {
                               src={property.image} 
                               alt="" 
                               className="w-full h-full object-cover"
-                              loading="lazy"
+                                     loading="eager"
                               decoding="async"
                               onError={(e) => {
                                 // Replace with placeholder on error

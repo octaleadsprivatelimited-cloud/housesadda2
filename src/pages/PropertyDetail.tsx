@@ -511,7 +511,7 @@ const PropertyDetail = () => {
                             style={{ border: 0 }}
                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                             allowFullScreen
-                            loading="lazy"
+                            loading="eager"
                             title="Property Video"
                             className="w-full h-full"
                           />
@@ -536,7 +536,7 @@ const PropertyDetail = () => {
                               height="100%"
                               style={{ border: 0 }}
                               allowFullScreen
-                              loading="lazy"
+                              loading="eager"
                               referrerPolicy="no-referrer-when-downgrade"
                               title="Property Location"
                               className="w-full h-full"
