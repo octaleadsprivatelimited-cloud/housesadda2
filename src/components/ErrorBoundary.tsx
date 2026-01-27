@@ -28,14 +28,8 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Log error for debugging (only in development or if console is available)
     if (typeof console !== 'undefined' && console.error) {
       console.error('ErrorBoundary caught an error:', error, errorInfo);
-    }
-    
-    // Optionally send to error tracking service in production
-    if (process.env.NODE_ENV === 'production') {
-      // You can add error tracking here (e.g., Sentry, LogRocket, etc.)
     }
   }
 
@@ -67,14 +61,6 @@ class ErrorBoundary extends Component<Props, State> {
                 Reload Page
               </Button>
             </div>
-            {process.env.NODE_ENV === 'development' && this.state.error && (
-              <details className="mt-4 text-left">
-                <summary className="cursor-pointer text-sm text-gray-500">Error Details</summary>
-                <pre className="mt-2 text-xs bg-gray-100 p-2 rounded overflow-auto">
-                  {this.state.error.stack}
-                </pre>
-              </details>
-            )}
           </div>
         </div>
       );
