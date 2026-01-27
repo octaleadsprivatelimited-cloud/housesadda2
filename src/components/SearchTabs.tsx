@@ -143,6 +143,7 @@ export function SearchTabs() {
   const handleSearch = () => {
     const params = new URLSearchParams();
     
+    // Set transaction type
     if (selectedTransaction) {
       if (selectedTransaction === 'Sale') {
         params.set('intent', 'buy');
@@ -153,10 +154,22 @@ export function SearchTabs() {
       }
     }
     
-    if (selectedArea) params.set('area', selectedArea);
-    if (selectedType) params.set('type', selectedType);
-    if (selectedBudget) params.set('budget', selectedBudget);
+    // Set area filter
+    if (selectedArea) {
+      params.set('area', selectedArea);
+    }
     
+    // Set type filter
+    if (selectedType) {
+      params.set('type', selectedType);
+    }
+    
+    // Set budget filter
+    if (selectedBudget) {
+      params.set('budget', selectedBudget);
+    }
+    
+    // Navigate to properties page with filters
     navigate(`/properties?${params.toString()}`);
   };
 
@@ -168,8 +181,9 @@ export function SearchTabs() {
           {transactionTypes.map((type) => (
             <button
               key={type.value}
+              type="button"
               onClick={() => setSelectedTransaction(type.value)}
-              className={`px-5 py-2 rounded-full text-xs font-semibold transition-all ${
+              className={`px-4 sm:px-5 py-2 rounded-full text-xs font-semibold transition-all ${
                 selectedTransaction === type.value
                   ? 'bg-primary text-white shadow-md'
                   : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
@@ -216,8 +230,9 @@ export function SearchTabs() {
 
           {/* Search Button */}
           <button 
+            type="button"
             onClick={handleSearch}
-            className="flex items-center justify-center gap-2 bg-gradient-to-r from-primary to-red-500 hover:from-primary/90 hover:to-red-500/90 text-white font-semibold py-3 px-8 rounded-lg transition-all hover:shadow-xl hover:shadow-primary/20 active:scale-[0.98] min-w-[120px] text-sm"
+            className="flex items-center justify-center gap-2 bg-gradient-to-r from-primary to-red-500 hover:from-primary/90 hover:to-red-500/90 text-white font-semibold py-3 px-6 sm:px-8 rounded-lg transition-all hover:shadow-xl hover:shadow-primary/20 active:scale-[0.98] min-w-[120px] text-sm"
           >
             <Search className="h-4 w-4" />
             <span>Search</span>
@@ -232,9 +247,12 @@ export function SearchTabs() {
           {areas.slice(1, 6).map((area) => (
             <button
               key={area.value}
+              type="button"
               onClick={() => {
                 setSelectedArea(area.value);
-                setTimeout(handleSearch, 100);
+                setTimeout(() => {
+                  handleSearch();
+                }, 100);
               }}
               className="px-3 py-1 text-xs text-gray-500 hover:text-white hover:bg-primary bg-white/80 backdrop-blur border border-gray-200 hover:border-primary rounded-full transition-all shadow-sm"
             >

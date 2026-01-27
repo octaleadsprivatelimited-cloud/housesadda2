@@ -45,9 +45,9 @@ export const PropertyCard = memo(function PropertyCard({ property }: PropertyCar
         <img
           src={property.image || 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=600&h=400&fit=crop&q=80'}
           alt={property.title}
-          loading="lazy"
-          decoding="async"
-          fetchPriority="low"
+          loading="eager"
+          decoding="sync"
+          fetchPriority="high"
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           onError={(e) => {
             const target = e.target as HTMLImageElement;

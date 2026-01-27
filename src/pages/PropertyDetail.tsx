@@ -286,9 +286,9 @@ const PropertyDetail = () => {
                     src={propertyData.images[currentImage]}
                     alt={`${propertyData.title} - Image ${currentImage + 1}`}
                     className="w-full h-full object-cover"
-                    loading={currentImage === 0 ? "eager" : "lazy"}
-                    decoding="async"
-                    fetchPriority={currentImage === 0 ? "high" : "low"}
+                    loading="eager"
+                    decoding="sync"
+                    fetchPriority="high"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
                       target.src = 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=1200&h=800&fit=crop&q=80';
@@ -351,9 +351,9 @@ const PropertyDetail = () => {
                             src={img} 
                             alt={`Thumbnail ${index + 1}`}
                             className="w-full h-full object-cover"
-                            loading="lazy"
-                            decoding="async"
-                            fetchPriority="low"
+                            loading="eager"
+                            decoding="sync"
+                            fetchPriority="high"
                             onError={(e) => {
                               const target = e.target as HTMLImageElement;
                               target.src = 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=200&h=150&fit=crop&q=80';

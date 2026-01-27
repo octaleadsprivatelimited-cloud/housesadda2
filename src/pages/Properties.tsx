@@ -189,13 +189,21 @@ const Properties = () => {
   // Filter properties (only apply budget filter locally, rest is handled by API)
   const filteredProperties = properties.filter((property) => {
     // Budget filter (local only since API doesn't support it yet)
-    const budgetMatch = property.price >= selectedBudget.min && property.price <= selectedBudget.max;
+    let budgetMatch = true;
+    if (budgetParam) {
+      const [minStr, maxStr] = budgetParam.split('-');
+      const min = minStr ? parseFloat(minStr) : 0;
+      const max = maxStr ? parseFloat(maxStr) : Infinity;
+      budgetMatch = property.price >= min && property.price <= max;
+    } else {
+      budgetMatch = property.price >= selectedBudget.min && property.price <= selectedBudget.max;
+    }
     
     // Local area filter (in case of additional filtering from dropdown)
-    const areaMatch = selectedArea === 'All Areas' || !areaParam || property.area === selectedArea;
+    const areaMatch = selectedArea === 'All Areas' || !areaParam || property.area === selectedArea || property.area === areaParam;
     
     // Local type filter
-    const typeMatch = selectedType === 'All Types' || !typeParam || property.type === selectedType;
+    const typeMatch = selectedType === 'All Types' || !typeParam || property.type === selectedType || property.type === typeParam;
     
     // Local search filter for title/description
     let searchMatch = true;
