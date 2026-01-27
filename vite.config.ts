@@ -19,16 +19,27 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: (id) => {
-          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/react-router')) {
+          // React and core dependencies - check first
+          if (id.includes('node_modules/react/') || 
+              id.includes('node_modules/react-dom/') || 
+              id.includes('node_modules/react-router/')) {
             return 'react-vendor';
           }
-          if (id.includes('node_modules/lucide-react') || id.includes('node_modules/@radix-ui')) {
+          // UI libraries
+          if (id.includes('node_modules/lucide-react') || 
+              id.includes('node_modules/@radix-ui')) {
             return 'ui-vendor';
           }
+          // Firebase
           if (id.includes('node_modules/firebase')) {
             return 'firebase-vendor';
           }
-          if (id.includes('node_modules')) {
+          // All other node_modules - but exclude already matched
+          if (id.includes('node_modules/') && 
+              !id.includes('node_modules/react') && 
+              !id.includes('node_modules/lucide-react') && 
+              !id.includes('node_modules/@radix-ui') && 
+              !id.includes('node_modules/firebase')) {
             return 'vendor';
           }
         },

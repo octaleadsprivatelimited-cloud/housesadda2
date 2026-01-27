@@ -23,7 +23,10 @@ const getApiBaseUrl = () => {
 };
 
 const API_BASE_URL = getApiBaseUrl();
-console.log('🔗 API Base URL:', API_BASE_URL);
+// Only log in development
+if (import.meta.env.DEV) {
+  console.log('🔗 API Base URL:', API_BASE_URL);
+}
 
 // Helper function to get auth token
 const getAuthToken = (): string | null => {
