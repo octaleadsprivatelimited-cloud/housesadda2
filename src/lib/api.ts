@@ -133,25 +133,49 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}, timeout: 
 
     return data;
   } catch (error: any) {
+    // Log error for debugging
+    if (import.meta.env.DEV) {
+      console.error('❌ API Request Error:', {
+        endpoint,
+        url: `${API_BASE_URL}${endpoint}`,
+        error: error.message,
+        name: error.name,
+        stack: error.stack
+      });
+    }
+
     if (error.name === 'AbortError') {
-      const timeoutError = new Error(`Request timed out after ${timeout / 1000} seconds. Please try again.`);
+      const timeoutError = new Error(`Request timed out after ${timeout / 1000} seconds. The server may be slow or unresponsive.`);
       (timeoutError as any).error = timeoutError.message;
       (timeoutError as any).status = 408;
       throw timeoutError;
     }
     
+    // If error already has error/message properties, use them
     if (error.error || error.message) {
       throw error;
     }
     
-    if (error.name === 'TypeError' && error.message.includes('fetch')) {
-      const networkError = new Error('Cannot connect to server. Make sure the backend is running.');
-      (networkError as any).error = networkError.message;
+    // Handle network/fetch errors
+    if (error.name === 'TypeError' && (error.message.includes('fetch') || error.message.includes('Failed to fetch') || error.message.includes('NetworkError'))) {
+      const isLocalhost = API_BASE_URL.includes('localhost') || API_BASE_URL.includes('127.0.0.1');
+      let errorMessage = 'Cannot connect to server. ';
+      
+      if (isLocalhost) {
+        errorMessage += 'Make sure the backend server is running on port 3001. Run: npm run dev:server';
+      } else {
+        errorMessage += 'Please check your internet connection or try again later.';
+      }
+      
+      const networkError = new Error(errorMessage);
+      (networkError as any).error = errorMessage;
       (networkError as any).status = 503;
+      (networkError as any).isNetworkError = true;
       throw networkError;
     }
     
-    const friendlyError = new Error(error.message || 'Network error. Please check your connection.');
+    // Generic error fallback
+    const friendlyError = new Error(error.message || 'Network error. Please check your connection and try again.');
     (friendlyError as any).error = friendlyError.message;
     (friendlyError as any).status = 500;
     throw friendlyError;
