@@ -819,7 +819,10 @@ router.post('/', authenticateToken, async (req, res) => {
       });
     }
 
-    // Save images
+    // Save images (non-blocking - property is already created)
+    let imagesSaved = 0;
+    let imagesError = null;
+    
     if (images && Array.isArray(images) && images.length > 0) {
       try {
         const batch = db.batch();
@@ -828,32 +831,55 @@ router.post('/', authenticateToken, async (req, res) => {
         // Limit images to prevent batch size issues (Firestore batch limit is 500 operations)
         const imagesToSave = validImages.slice(0, 10); // Limit to 10 images per property
         
-        imagesToSave.forEach((imageData, index) => {
-          const imageRef = db.collection('property_images').doc();
-          batch.set(imageRef, {
-            property_id: propertyId,
-            image_data: imageData.substring(0, 10485760), // Limit to 10MB per image (Firestore limit)
-            display_order: index,
-            created_at: admin.firestore.FieldValue.serverTimestamp()
-          });
-        });
-        
         if (imagesToSave.length > 0) {
-          await batch.commit();
-          console.log(`✅ Saved ${imagesToSave.length} images for property ${propertyId}`);
+          imagesToSave.forEach((imageData, index) => {
+            try {
+              // Validate image data size before adding to batch
+              const imageDataStr = String(imageData);
+              if (imageDataStr.length > 10485760) {
+                console.warn(`⚠️  Image ${index} is too large (${imageDataStr.length} bytes), truncating to 10MB`);
+              }
+              
+              const imageRef = db.collection('property_images').doc();
+              batch.set(imageRef, {
+                property_id: propertyId,
+                image_data: imageDataStr.substring(0, 10485760), // Limit to 10MB per image (Firestore limit)
+                display_order: index,
+                created_at: admin.firestore.FieldValue.serverTimestamp()
+              });
+            } catch (imgError) {
+              console.error(`❌ Error processing image ${index}:`, imgError.message);
+              // Continue with other images
+            }
+          });
+          
+          if (imagesToSave.length > 0) {
+            await batch.commit();
+            imagesSaved = imagesToSave.length;
+            console.log(`✅ Saved ${imagesSaved} images for property ${propertyId}`);
+          }
         }
       } catch (imageError) {
         console.error('❌ Error saving images:', imageError);
+        console.error('   Message:', imageError.message);
         console.error('   Stack:', imageError.stack);
-        // Don't fail the whole request if images fail - property is already created
+        imagesError = imageError.message;
+        // Don't fail the whole request - property is already created successfully
         console.warn('⚠️  Property created but images failed to save');
       }
     }
 
-    res.json({ 
+    // Send success response - property was created successfully
+    // Include image save status in response
+    return res.json({ 
       success: true, 
       id: propertyId,
-      message: 'Property created successfully'
+      message: 'Property created successfully',
+      images: {
+        saved: imagesSaved,
+        total: images && Array.isArray(images) ? images.length : 0,
+        error: imagesError || null
+      }
     });
   } catch (error) {
     console.error('❌ Create property error:', error);
@@ -861,8 +887,14 @@ router.post('/', authenticateToken, async (req, res) => {
     console.error('   Stack:', error.stack);
     console.error('   Request body keys:', Object.keys(req.body || {}));
     
+    // Check if response was already sent
+    if (res.headersSent) {
+      console.error('⚠️  Response already sent, cannot send error response');
+      return;
+    }
+    
     // Return detailed error for debugging
-    res.status(500).json({ 
+    return res.status(500).json({ 
       success: false,
       error: 'Internal server error', 
       message: error.message || 'An unexpected error occurred while creating the property',
