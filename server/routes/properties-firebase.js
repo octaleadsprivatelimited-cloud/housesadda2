@@ -473,8 +473,8 @@ router.get('/search', async (req, res) => {
     let query = db.collection('properties');
 
     // Get location_id and type_id if filters provided
-    let locationId = null;
-    let typeId = null;
+    let searchLocationId = null;
+    let searchTypeId = null;
 
     // Location lookup
     if (area || city) {
@@ -486,7 +486,7 @@ router.get('/search', async (req, res) => {
         }
         const locationSnapshot = await locationQuery.limit(1).get();
         if (!locationSnapshot.empty) {
-          locationId = locationSnapshot.docs[0].id;
+          searchLocationId = locationSnapshot.docs[0].id;
         } else if (area && !city) {
           // Case-insensitive fallback
           const allLocations = await db.collection('locations').get();
@@ -494,12 +494,12 @@ router.get('/search', async (req, res) => {
             const locData = doc.data();
             return locData.name && locData.name.toLowerCase() === area.toLowerCase();
           });
-          if (matched) locationId = matched.id;
+          if (matched) searchLocationId = matched.id;
         }
       } else if (city) {
         locationQuery = locationQuery.where('city', '==', city);
         const locationSnapshot = await locationQuery.limit(1).get();
-        if (!locationSnapshot.empty) locationId = locationSnapshot.docs[0].id;
+        if (!locationSnapshot.empty) searchLocationId = locationSnapshot.docs[0].id;
       }
     }
 
@@ -510,7 +510,7 @@ router.get('/search', async (req, res) => {
         .limit(1)
         .get();
       if (!typeSnapshot.empty) {
-        typeId = typeSnapshot.docs[0].id;
+        searchTypeId = typeSnapshot.docs[0].id;
       } else {
         // Case-insensitive fallback
         const allTypes = await db.collection('property_types').get();
@@ -518,13 +518,13 @@ router.get('/search', async (req, res) => {
           const typeData = doc.data();
           return typeData.name && typeData.name.toLowerCase() === type.toLowerCase();
         });
-        if (matched) typeId = matched.id;
+        if (matched) searchTypeId = matched.id;
       }
     }
 
     // Apply Firestore filters
-    if (typeId) query = query.where('type_id', '==', typeId);
-    if (locationId) query = query.where('location_id', '==', locationId);
+    if (searchTypeId) query = query.where('type_id', '==', searchTypeId);
+    if (searchLocationId) query = query.where('location_id', '==', searchLocationId);
     if (transactionType) query = query.where('transaction_type', '==', transactionType);
     
     // Only show active properties for public search
@@ -690,8 +690,8 @@ router.post('/', authenticateToken, async (req, res) => {
     });
 
     // Get location_id and type_id with better error handling
-    let locationId = null;
-    let typeId = null;
+    let foundLocationId = null;
+    let foundTypeId = null;
 
     // Location lookup with case-insensitive fallback
     if (area) {
@@ -703,7 +703,7 @@ router.post('/', authenticateToken, async (req, res) => {
       const locationSnapshot = await locationQuery.limit(1).get();
       
       if (!locationSnapshot.empty) {
-        locationId = locationSnapshot.docs[0].id;
+        foundLocationId = locationSnapshot.docs[0].id;
       } else {
         // Case-insensitive fallback
         const allLocations = await db.collection('locations').get();
@@ -714,7 +714,7 @@ router.post('/', authenticateToken, async (req, res) => {
           return nameMatch && cityMatch;
         });
         if (matched) {
-          locationId = matched.id;
+          foundLocationId = matched.id;
         } else {
           console.error(`❌ Location not found: ${area}, ${city || 'Hyderabad'}`);
           return res.status(400).json({ 
@@ -736,7 +736,7 @@ router.post('/', authenticateToken, async (req, res) => {
         .get();
       
       if (!typeSnapshot.empty) {
-        typeId = typeSnapshot.docs[0].id;
+        foundTypeId = typeSnapshot.docs[0].id;
       } else {
         // Case-insensitive fallback
         const allTypes = await db.collection('property_types').get();
@@ -745,7 +745,7 @@ router.post('/', authenticateToken, async (req, res) => {
           return typeData.name && typeData.name.toLowerCase() === type.toLowerCase();
         });
         if (matched) {
-          typeId = matched.id;
+          foundTypeId = matched.id;
         } else {
           console.error(`❌ Property type not found: ${type}`);
           return res.status(400).json({ 
@@ -759,7 +759,7 @@ router.post('/', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Property type is required' });
     }
 
-    console.log(`✅ Found location_id: ${locationId}, type_id: ${typeId}`);
+    console.log(`✅ Found location_id: ${foundLocationId}, type_id: ${foundTypeId}`);
 
     const finalTransactionType = transactionType || 'Sale';
 
@@ -787,8 +787,8 @@ router.post('/', authenticateToken, async (req, res) => {
     try {
       const propertyData = {
         title: String(title).trim(),
-        location_id: locationId,
-        type_id: typeId,
+        location_id: foundLocationId,
+        type_id: foundTypeId,
         city: city || 'Hyderabad',
         price: parseFloat(price) || 0,
         bedrooms: parseInt(bedrooms) || 0,
@@ -918,8 +918,8 @@ router.put('/:id', authenticateToken, async (req, res) => {
     } = req.body;
 
     // Get location_id and type_id
-    let locationId = null;
-    let typeId = null;
+    let updateLocationId = null;
+    let updateTypeId = null;
 
     if (area || city) {
       const locationSnapshot = await db.collection('locations')
@@ -927,7 +927,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
         .where('city', '==', city || 'Hyderabad')
         .limit(1)
         .get();
-      if (!locationSnapshot.empty) locationId = locationSnapshot.docs[0].id;
+      if (!locationSnapshot.empty) updateLocationId = locationSnapshot.docs[0].id;
     }
 
     if (type) {
@@ -935,7 +935,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
         .where('name', '==', type)
         .limit(1)
         .get();
-      if (!typeSnapshot.empty) typeId = typeSnapshot.docs[0].id;
+      if (!typeSnapshot.empty) updateTypeId = typeSnapshot.docs[0].id;
     }
 
     const updateData = {
@@ -943,8 +943,8 @@ router.put('/:id', authenticateToken, async (req, res) => {
     };
 
     if (title) updateData.title = title;
-    if (locationId) updateData.location_id = locationId;
-    if (typeId) updateData.type_id = typeId;
+    if (updateLocationId) updateData.location_id = updateLocationId;
+    if (updateTypeId) updateData.type_id = updateTypeId;
     if (city) updateData.city = city;
     if (price !== undefined) updateData.price = parseFloat(price);
     if (bedrooms !== undefined) updateData.bedrooms = parseInt(bedrooms);
