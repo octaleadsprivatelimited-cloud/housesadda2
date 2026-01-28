@@ -749,44 +749,77 @@ router.post('/', authenticateToken, async (req, res) => {
     const propertyId = await getNextPropertyId(finalTransactionType, db);
 
     // Create property with custom ID
-    await db.collection('properties').doc(propertyId).set({
-      title,
-      location_id: locationId,
-      type_id: typeId,
-      city: city || 'Hyderabad',
-      price: parseFloat(price),
-      bedrooms: parseInt(bedrooms) || 0,
-      bathrooms: parseInt(bathrooms) || 0,
-      sqft: parseInt(sqft) || 0,
-      description: description || '',
-      transaction_type: finalTransactionType,
-      is_featured: isFeatured === true,
-      is_active: isActive !== false,
-      amenities: amenities || [],
-      highlights: highlights || [],
-      brochure_url: brochureUrl || '',
-      map_url: mapUrl || '',
-      video_url: videoUrl || '',
-      created_at: admin.firestore.FieldValue.serverTimestamp(),
-      updated_at: admin.firestore.FieldValue.serverTimestamp()
-    });
+    try {
+      const propertyData = {
+        title: String(title).trim(),
+        location_id: locationId,
+        type_id: typeId,
+        city: city || 'Hyderabad',
+        price: parseFloat(price) || 0,
+        bedrooms: parseInt(bedrooms) || 0,
+        bathrooms: parseInt(bathrooms) || 0,
+        sqft: parseInt(sqft) || 0,
+        description: String(description || '').trim(),
+        transaction_type: finalTransactionType,
+        is_featured: isFeatured === true,
+        is_active: isActive !== false,
+        amenities: Array.isArray(amenities) ? amenities : [],
+        highlights: Array.isArray(highlights) ? highlights : [],
+        brochure_url: String(brochureUrl || '').trim(),
+        map_url: String(mapUrl || '').trim(),
+        video_url: String(videoUrl || '').trim(),
+        created_at: admin.firestore.FieldValue.serverTimestamp(),
+        updated_at: admin.firestore.FieldValue.serverTimestamp()
+      };
 
-    // Save images
-    if (images && images.length > 0) {
-      const batch = db.batch();
-      images.forEach((imageData, index) => {
-        const imageRef = db.collection('property_images').doc();
-        batch.set(imageRef, {
-          property_id: propertyId,
-          image_data: imageData,
-          display_order: index,
-          created_at: admin.firestore.FieldValue.serverTimestamp()
-        });
+      await db.collection('properties').doc(propertyId).set(propertyData);
+      console.log(`✅ Property created: ${propertyId}`);
+    } catch (createError) {
+      console.error('❌ Error creating property document:', createError);
+      console.error('   Stack:', createError.stack);
+      return res.status(500).json({ 
+        success: false,
+        error: 'Failed to create property', 
+        message: createError.message || 'Database write failed. Please try again.'
       });
-      await batch.commit();
     }
 
-    res.json({ success: true, id: propertyId });
+    // Save images
+    if (images && Array.isArray(images) && images.length > 0) {
+      try {
+        const batch = db.batch();
+        const validImages = images.filter(img => img && typeof img === 'string' && img.trim() !== '');
+        
+        // Limit images to prevent batch size issues (Firestore batch limit is 500 operations)
+        const imagesToSave = validImages.slice(0, 10); // Limit to 10 images per property
+        
+        imagesToSave.forEach((imageData, index) => {
+          const imageRef = db.collection('property_images').doc();
+          batch.set(imageRef, {
+            property_id: propertyId,
+            image_data: imageData.substring(0, 10485760), // Limit to 10MB per image (Firestore limit)
+            display_order: index,
+            created_at: admin.firestore.FieldValue.serverTimestamp()
+          });
+        });
+        
+        if (imagesToSave.length > 0) {
+          await batch.commit();
+          console.log(`✅ Saved ${imagesToSave.length} images for property ${propertyId}`);
+        }
+      } catch (imageError) {
+        console.error('❌ Error saving images:', imageError);
+        console.error('   Stack:', imageError.stack);
+        // Don't fail the whole request if images fail - property is already created
+        console.warn('⚠️  Property created but images failed to save');
+      }
+    }
+
+    res.json({ 
+      success: true, 
+      id: propertyId,
+      message: 'Property created successfully'
+    });
   } catch (error) {
     console.error('❌ Create property error:', error);
     console.error('   Message:', error.message);
