@@ -15,33 +15,51 @@ function getDatabase() {
 
 // Generate property ID based on transaction type: R#001 for Rent, B#001 for Buy/Sale
 async function getNextPropertyId(transactionType, db) {
-  const isRent = transactionType === 'Rent' || transactionType === 'PG';
-  const prefix = isRent ? 'R' : 'B';
-  const counterDocId = isRent ? 'property_id_rent' : 'property_id_buy';
-  
-  const counterRef = db.collection('counters').doc(counterDocId);
-  
-  const newId = await db.runTransaction(async (transaction) => {
-    const counterDoc = await transaction.get(counterRef);
-    let currentCount = 0;
+  try {
+    const isRent = transactionType === 'Rent' || transactionType === 'PG';
+    const prefix = isRent ? 'R' : 'B';
+    const counterDocId = isRent ? 'property_id_rent' : 'property_id_buy';
     
-    if (counterDoc.exists) {
-      currentCount = counterDoc.data().count || 0;
-    }
+    console.log(`🔢 Generating property ID for transaction type: ${transactionType} (prefix: ${prefix}, counter: ${counterDocId})`);
     
-    currentCount++;
-    transaction.set(counterRef, {
-      count: currentCount,
-      updated_at: admin.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
+    const counterRef = db.collection('counters').doc(counterDocId);
     
-    // Generate ID in format R#001, R#002, B#001, B#002, etc.
-    const formattedId = `${prefix}#${String(currentCount).padStart(3, '0')}`;
-    return formattedId;
-  });
-  
-  console.log(`✅ Generated property ID: ${newId}`);
-  return newId;
+    const newId = await db.runTransaction(async (transaction) => {
+      try {
+        const counterDoc = await transaction.get(counterRef);
+        let currentCount = 0;
+        
+        if (counterDoc.exists) {
+          currentCount = counterDoc.data().count || 0;
+          console.log(`   Current count: ${currentCount}`);
+        } else {
+          console.log(`   Counter document doesn't exist, starting from 0`);
+        }
+        
+        currentCount++;
+        transaction.set(counterRef, {
+          count: currentCount,
+          updated_at: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        
+        // Generate ID in format R#001, R#002, B#001, B#002, etc.
+        const formattedId = `${prefix}#${String(currentCount).padStart(3, '0')}`;
+        console.log(`   Generated ID: ${formattedId}`);
+        return formattedId;
+      } catch (transactionError) {
+        console.error('❌ Transaction error:', transactionError);
+        throw transactionError;
+      }
+    });
+    
+    console.log(`✅ Generated property ID: ${newId}`);
+    return newId;
+  } catch (error) {
+    console.error('❌ getNextPropertyId error:', error);
+    console.error('   Message:', error.message);
+    console.error('   Stack:', error.stack);
+    throw error;
+  }
 }
 
 // Optimized format property for list view (no images)
@@ -746,7 +764,24 @@ router.post('/', authenticateToken, async (req, res) => {
     const finalTransactionType = transactionType || 'Sale';
 
     // Generate property ID: R#001 for Rent, B#001 for Buy/Sale
-    const propertyId = await getNextPropertyId(finalTransactionType, db);
+    let propertyId;
+    try {
+      propertyId = await getNextPropertyId(finalTransactionType, db);
+      console.log(`✅ Generated property ID: ${propertyId}`);
+    } catch (idError) {
+      console.error('❌ Error generating property ID:', idError);
+      console.error('   Message:', idError.message);
+      console.error('   Stack:', idError.stack);
+      return res.status(500).json({ 
+        success: false,
+        error: 'Failed to generate property ID', 
+        message: idError.message || 'Database transaction failed. Please try again.',
+        details: process.env.NODE_ENV === 'development' ? {
+          stack: idError.stack,
+          name: idError.name
+        } : undefined
+      });
+    }
 
     // Create property with custom ID
     try {
