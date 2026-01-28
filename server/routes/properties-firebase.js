@@ -225,8 +225,8 @@ router.get('/', async (req, res) => {
     query = query.where('is_active', '==', activeValue);
 
     // Get location_id and type_id if filters provided
-    let locationId = null;
-    let typeId = null;
+    let queryLocationId = null;
+    let queryTypeId = null;
 
     // Location lookup with case-insensitive fallback
     if (area || city) {
@@ -238,7 +238,7 @@ router.get('/', async (req, res) => {
         }
         const locationSnapshot = await locationQuery.limit(1).get();
         if (!locationSnapshot.empty) {
-          locationId = locationSnapshot.docs[0].id;
+          queryLocationId = locationSnapshot.docs[0].id;
         } else if (area && !city) {
           // Case-insensitive fallback
           const allLocations = await db.collection('locations').get();
@@ -246,12 +246,12 @@ router.get('/', async (req, res) => {
             const locData = doc.data();
             return locData.name && locData.name.toLowerCase() === area.toLowerCase();
           });
-          if (matched) locationId = matched.id;
+          if (matched) queryLocationId = matched.id;
         }
       } else if (city) {
         locationQuery = locationQuery.where('city', '==', city);
         const locationSnapshot = await locationQuery.limit(1).get();
-        if (!locationSnapshot.empty) locationId = locationSnapshot.docs[0].id;
+        if (!locationSnapshot.empty) queryLocationId = locationSnapshot.docs[0].id;
       }
     }
 
@@ -262,7 +262,7 @@ router.get('/', async (req, res) => {
         .limit(1)
         .get();
       if (!typeSnapshot.empty) {
-        typeId = typeSnapshot.docs[0].id;
+        queryTypeId = typeSnapshot.docs[0].id;
       } else {
         // Case-insensitive fallback
         const allTypes = await db.collection('property_types').get();
@@ -270,7 +270,7 @@ router.get('/', async (req, res) => {
           const typeData = doc.data();
           return typeData.name && typeData.name.toLowerCase() === type.toLowerCase();
         });
-        if (matched) typeId = matched.id;
+        if (matched) queryTypeId = matched.id;
       }
     }
 
@@ -279,11 +279,11 @@ router.get('/', async (req, res) => {
     if (transactionType) {
       query = query.where('transaction_type', '==', transactionType);
     }
-    if (typeId) {
-      query = query.where('type_id', '==', typeId);
+    if (queryTypeId) {
+      query = query.where('type_id', '==', queryTypeId);
     }
-    if (locationId) {
-      query = query.where('location_id', '==', locationId);
+    if (queryLocationId) {
+      query = query.where('location_id', '==', queryLocationId);
     }
     if (featured !== undefined) {
       query = query.where('is_featured', '==', featured === 'true');
