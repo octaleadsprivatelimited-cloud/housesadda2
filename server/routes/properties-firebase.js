@@ -177,26 +177,43 @@ async function formatProperty(prop, db, skipImages = false) {
   }
 }
 
-// Get all properties (OPTIMIZED for fast loading)
+// Get all properties (OPTIMIZED for fast loading) - Magicbricks style filtering
 router.get('/', async (req, res) => {
   try {
     const db = getDatabase();
-    const { search, type, city, area, featured, active, transactionType, limit = 20, offset = 0, skipImages } = req.query;
+    const { search, type, city, area, featured, active, transactionType, limit = 20, offset = 0, skipImages, budget } = req.query;
 
     const shouldSkipImages = skipImages === 'true' || skipImages === true;
     const limitNum = Math.min(parseInt(limit) || 20, 100); // Max 100 per request
     const offsetNum = parseInt(offset) || 0;
 
+    console.log('🔍 Properties API Request:', {
+      transactionType,
+      type,
+      area,
+      city,
+      featured,
+      active,
+      search,
+      budget,
+      limit: limitNum,
+      offset: offsetNum
+    });
+
     let query = db.collection('properties');
+
+    // ALWAYS filter by active=true for public queries (unless explicitly set to false)
+    const activeValue = active === 'false' ? false : true;
+    query = query.where('is_active', '==', activeValue);
 
     // Get location_id and type_id if filters provided
     let locationId = null;
     let typeId = null;
 
+    // Location lookup with case-insensitive fallback
     if (area || city) {
       let locationQuery = db.collection('locations');
       if (area) {
-        // Try exact match first
         locationQuery = locationQuery.where('name', '==', area);
         if (city) {
           locationQuery = locationQuery.where('city', '==', city);
@@ -205,8 +222,7 @@ router.get('/', async (req, res) => {
         if (!locationSnapshot.empty) {
           locationId = locationSnapshot.docs[0].id;
         } else if (area && !city) {
-          // If exact match fails and no city specified, try case-insensitive search
-          // Firestore doesn't support case-insensitive, so we'll fetch and filter
+          // Case-insensitive fallback
           const allLocations = await db.collection('locations').get();
           const matched = allLocations.docs.find(doc => {
             const locData = doc.data();
@@ -221,8 +237,8 @@ router.get('/', async (req, res) => {
       }
     }
 
+    // Type lookup with case-insensitive fallback
     if (type) {
-      // Try exact match first
       const typeSnapshot = await db.collection('property_types')
         .where('name', '==', type)
         .limit(1)
@@ -230,7 +246,7 @@ router.get('/', async (req, res) => {
       if (!typeSnapshot.empty) {
         typeId = typeSnapshot.docs[0].id;
       } else {
-        // If exact match fails, try case-insensitive search
+        // Case-insensitive fallback
         const allTypes = await db.collection('property_types').get();
         const matched = allTypes.docs.find(doc => {
           const typeData = doc.data();
@@ -240,26 +256,33 @@ router.get('/', async (req, res) => {
       }
     }
 
-    // Apply filters
-    if (typeId) query = query.where('type_id', '==', typeId);
-    if (locationId) query = query.where('location_id', '==', locationId);
-    if (featured !== undefined) query = query.where('is_featured', '==', featured === 'true');
-    if (transactionType) query = query.where('transaction_type', '==', transactionType);
-    
-    // Apply active filter at Firestore level (default to true for public queries)
-    // Only filter by active if explicitly requested, otherwise default to active=true
-    const shouldFilterActive = active !== undefined;
-    const activeValue = shouldFilterActive ? (active === 'true') : true;
-    query = query.where('is_active', '==', activeValue);
+    // Apply Firestore filters (order matters for compound queries)
+    // Apply transaction_type FIRST (most important filter)
+    if (transactionType) {
+      query = query.where('transaction_type', '==', transactionType);
+    }
+    if (typeId) {
+      query = query.where('type_id', '==', typeId);
+    }
+    if (locationId) {
+      query = query.where('location_id', '==', locationId);
+    }
+    if (featured !== undefined) {
+      query = query.where('is_featured', '==', featured === 'true');
+    }
 
-    // Order and limit at Firestore level for better performance
+    // Order and limit at Firestore level
     query = query.orderBy('created_at', 'desc');
-    query = query.limit(limitNum + offsetNum);
+    // Fetch more than needed for filtering (budget/search filters are in-memory)
+    const fetchLimit = Math.min(limitNum + offsetNum + 100, 500); // Extra buffer for post-filtering
+    query = query.limit(fetchLimit);
 
     const snapshot = await query.get();
     let properties = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-    // Apply search filter
+    console.log(`📊 Found ${properties.length} properties after Firestore query`);
+
+    // Apply search filter (in memory)
     if (search) {
       const searchLower = search.toLowerCase();
       properties = properties.filter(prop =>
@@ -267,11 +290,28 @@ router.get('/', async (req, res) => {
         (prop.description || '').toLowerCase().includes(searchLower) ||
         (prop.id || '').toLowerCase().includes(searchLower)
       );
+      console.log(`🔎 After search filter: ${properties.length} properties`);
     }
 
-    // Apply budget filter (price range)
-    const minPrice = req.query.minPrice ? parseFloat(req.query.minPrice) : null;
-    const maxPrice = req.query.maxPrice ? parseFloat(req.query.maxPrice) : null;
+    // Apply budget filter (price range) - parse budget string if provided
+    let minPrice = req.query.minPrice ? parseFloat(req.query.minPrice) : null;
+    let maxPrice = req.query.maxPrice ? parseFloat(req.query.maxPrice) : null;
+
+    if (budget && !minPrice && !maxPrice) {
+      // Parse budget string format: "min-max" or "min-" or "-max"
+      const budgetParts = String(budget).split('-');
+      if (budgetParts.length === 2) {
+        minPrice = budgetParts[0] ? parseFloat(budgetParts[0]) : 0;
+        maxPrice = budgetParts[1] ? parseFloat(budgetParts[1]) : Infinity;
+      } else if (String(budget).startsWith('-')) {
+        maxPrice = parseFloat(String(budget).substring(1));
+        minPrice = 0;
+      } else if (String(budget).endsWith('-')) {
+        minPrice = parseFloat(String(budget).replace('-', ''));
+        maxPrice = Infinity;
+      }
+    }
+
     if (minPrice !== null || maxPrice !== null) {
       properties = properties.filter(prop => {
         const price = parseFloat(prop.price) || 0;
@@ -284,10 +324,12 @@ router.get('/', async (req, res) => {
         }
         return true;
       });
+      console.log(`💰 After budget filter: ${properties.length} properties`);
     }
 
     // Apply pagination
     const paginatedProperties = properties.slice(offsetNum, offsetNum + limitNum);
+    console.log(`📄 Returning ${paginatedProperties.length} properties (offset: ${offsetNum}, limit: ${limitNum})`);
 
     // OPTIMIZATION: Batch fetch all locations and types upfront
     const locationIds = [...new Set(paginatedProperties.map(p => p.location_id).filter(Boolean))];
