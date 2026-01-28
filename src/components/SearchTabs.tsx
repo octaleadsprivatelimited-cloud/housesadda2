@@ -1,17 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, MapPin, Home, IndianRupee, ChevronDown, Check, Loader2 } from 'lucide-react';
-import { typesAPI, locationsAPI, propertiesAPI } from '@/lib/api';
+import { Search, MapPin, Home, IndianRupee, ChevronDown, Check } from 'lucide-react';
+import { typesAPI, locationsAPI } from '@/lib/api';
 
 const budgetRanges = [
   { label: 'Any Budget', value: '' },
-  { label: 'Under 25L', value: '0-2500000' },
-  { label: '25L - 50L', value: '2500000-5000000' },
-  { label: '50L - 75L', value: '5000000-7500000' },
-  { label: '75L - 1Cr', value: '7500000-10000000' },
-  { label: '1Cr - 2Cr', value: '10000000-20000000' },
-  { label: '2Cr - 5Cr', value: '20000000-50000000' },
-  { label: '5Cr+', value: '50000000-' },
+  { label: 'Under ₹25 Lakh', value: '0-2500000' },
+  { label: '₹25L - ₹50 Lakh', value: '2500000-5000000' },
+  { label: '₹50L - ₹75 Lakh', value: '5000000-7500000' },
+  { label: '₹75L - ₹1 Crore', value: '7500000-10000000' },
+  { label: '₹1Cr - ₹2 Crore', value: '10000000-20000000' },
+  { label: '₹2Cr - ₹5 Crore', value: '20000000-50000000' },
+  { label: 'Above ₹5 Crore', value: '50000000-' },
 ];
 
 const transactionTypes = [
@@ -101,9 +101,6 @@ export function SearchTabs() {
   const [selectedBudget, setSelectedBudget] = useState('');
   const [selectedTransaction, setSelectedTransaction] = useState('Sale');
   const [isLoading, setIsLoading] = useState(true);
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [showResults, setShowResults] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -112,14 +109,17 @@ export function SearchTabs() {
   const loadData = async () => {
     try {
       setIsLoading(true);
-      const types = await typesAPI.getAll();
+      const [types, locations] = await Promise.all([
+        typesAPI.getAll().catch(() => []),
+        locationsAPI.getAll().catch(() => [])
+      ]);
+      
       const typeOptions = [
         { label: 'All Types', value: '' },
         ...types.map((t: any) => ({ label: t.name, value: t.name }))
       ];
       setPropertyTypes(typeOptions);
       
-      const locations = await locationsAPI.getAll();
       const areaOptions = [
         { label: 'All Areas', value: '' },
         ...locations.map((l: any) => ({ label: l.name, value: l.name }))
@@ -127,101 +127,58 @@ export function SearchTabs() {
       setAreas(areaOptions);
     } catch (error) {
       console.error('Error loading data:', error);
+      // Fallback options
       setPropertyTypes([
         { label: 'All Types', value: '' },
         { label: 'Apartment', value: 'Apartment' },
         { label: 'Villa', value: 'Villa' },
         { label: 'Plot', value: 'Plot' },
+        { label: 'Commercial', value: 'Commercial' },
+        { label: 'PG', value: 'PG' },
       ]);
       setAreas([
         { label: 'All Areas', value: '' },
         { label: 'Gachibowli', value: 'Gachibowli' },
         { label: 'Hitech City', value: 'Hitech City' },
+        { label: 'Kondapur', value: 'Kondapur' },
+        { label: 'Jubilee Hills', value: 'Jubilee Hills' },
+        { label: 'Banjara Hills', value: 'Banjara Hills' },
       ]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSearch = async () => {
-    setIsSearching(true);
-    setShowResults(false);
+  const handleSearch = () => {
+    // Build URL parameters - Magicbricks style
+    const params = new URLSearchParams();
     
-    try {
-      // Build search parameters
-      const searchParams: any = {
-        active: true,
-        limit: 20,
-        skipImages: false
-      };
-
-      // Add transaction type
-      if (selectedTransaction) {
-        searchParams.transactionType = selectedTransaction;
-      }
-
-      // Add area filter
-      if (selectedArea) {
-        searchParams.area = selectedArea;
-      }
-
-      // Add type filter
-      if (selectedType) {
-        searchParams.type = selectedType;
-      }
-
-      // Add budget filter
-      if (selectedBudget) {
-        searchParams.budget = selectedBudget;
-      }
-
-      // Call search API
-      const response = await propertiesAPI.search(searchParams);
-      
-      // Handle response
-      const results = response.properties || response || [];
-      setSearchResults(results);
-      setShowResults(true);
-
-      // Also navigate to properties page with filters for full view
-      const urlParams = new URLSearchParams();
-      if (selectedTransaction) {
-        if (selectedTransaction === 'Sale') {
-          urlParams.set('intent', 'buy');
-        } else if (selectedTransaction === 'Rent') {
-          urlParams.set('intent', 'rent');
-        } else {
-          urlParams.set('transactionType', selectedTransaction);
-        }
-      }
-      if (selectedArea) urlParams.set('area', selectedArea);
-      if (selectedType) urlParams.set('type', selectedType);
-      if (selectedBudget) urlParams.set('budget', selectedBudget);
-
-      // Navigate after a short delay to show results
-      setTimeout(() => {
-        navigate(`/properties?${urlParams.toString()}`);
-      }, 500);
-    } catch (error: any) {
-      console.error('Search error:', error);
-      // Still navigate to properties page even if search fails
-      const urlParams = new URLSearchParams();
-      if (selectedTransaction) {
-        if (selectedTransaction === 'Sale') {
-          urlParams.set('intent', 'buy');
-        } else if (selectedTransaction === 'Rent') {
-          urlParams.set('intent', 'rent');
-        } else {
-          urlParams.set('transactionType', selectedTransaction);
-        }
-      }
-      if (selectedArea) urlParams.set('area', selectedArea);
-      if (selectedType) urlParams.set('type', selectedType);
-      if (selectedBudget) urlParams.set('budget', selectedBudget);
-      navigate(`/properties?${urlParams.toString()}`);
-    } finally {
-      setIsSearching(false);
+    // Map transaction type to intent (for Buy/Rent) or transactionType (for others)
+    if (selectedTransaction === 'Sale') {
+      params.set('intent', 'buy');
+    } else if (selectedTransaction === 'Rent') {
+      params.set('intent', 'rent');
+    } else {
+      params.set('transactionType', selectedTransaction);
     }
+    
+    // Add area filter
+    if (selectedArea && selectedArea !== 'All Areas') {
+      params.set('area', selectedArea);
+    }
+    
+    // Add type filter
+    if (selectedType && selectedType !== 'All Types') {
+      params.set('type', selectedType);
+    }
+    
+    // Add budget filter
+    if (selectedBudget) {
+      params.set('budget', selectedBudget);
+    }
+    
+    // Navigate to properties page with all filters
+    navigate(`/properties?${params.toString()}`);
   };
 
   return (
@@ -283,89 +240,25 @@ export function SearchTabs() {
           <button 
             type="button"
             onClick={handleSearch}
-            disabled={isSearching}
-            className="flex items-center justify-center gap-2 bg-gradient-to-r from-primary to-red-500 hover:from-primary/90 hover:to-red-500/90 text-white font-semibold py-3 px-6 sm:px-8 rounded-lg transition-all hover:shadow-xl hover:shadow-primary/20 active:scale-[0.98] min-w-[120px] text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center justify-center gap-2 bg-gradient-to-r from-primary to-red-500 hover:from-primary/90 hover:to-red-500/90 text-white font-semibold py-3 px-6 sm:px-8 rounded-lg transition-all hover:shadow-xl hover:shadow-primary/20 active:scale-[0.98] min-w-[120px] text-sm"
           >
-            {isSearching ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Searching...</span>
-              </>
-            ) : (
-              <>
-                <Search className="h-4 w-4" />
-                <span>Search</span>
-              </>
-            )}
+            <Search className="h-4 w-4" />
+            <span>Search</span>
           </button>
         </div>
       </div>
 
-      {/* Search Results Preview */}
-      {showResults && searchResults.length > 0 && (
-        <div className="mt-4 bg-white rounded-xl shadow-lg border border-gray-100 p-4 max-h-96 overflow-y-auto">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-gray-800">
-              Found {searchResults.length} {searchResults.length === 1 ? 'property' : 'properties'}
-            </h3>
-            <button
-              type="button"
-              onClick={() => setShowResults(false)}
-              className="text-xs text-gray-500 hover:text-gray-700"
-            >
-              Hide
-            </button>
-          </div>
-          <div className="space-y-2">
-            {searchResults.slice(0, 5).map((property: any) => (
-              <a
-                key={property.id}
-                href={`/property/${property.id}`}
-                className="block p-2 rounded-lg hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-200"
-              >
-                <div className="flex items-center gap-3">
-                  {property.image && (
-                    <img
-                      src={property.image}
-                      alt={property.title}
-                      className="w-16 h-16 rounded-lg object-cover"
-                    />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-800 truncate">{property.title}</p>
-                    <p className="text-xs text-gray-500">
-                      {property.area}, {property.city}
-                    </p>
-                    <p className="text-xs font-semibold text-primary mt-1">
-                      {property.price >= 10000000
-                        ? `₹${(property.price / 10000000).toFixed(2)} Cr`
-                        : property.price >= 100000
-                        ? `₹${(property.price / 100000).toFixed(1)} Lac`
-                        : `₹${property.price.toLocaleString('en-IN')}`}
-                    </p>
-                  </div>
-                </div>
-              </a>
-            ))}
-          </div>
-          {searchResults.length > 5 && (
-            <p className="text-xs text-gray-500 mt-3 text-center">
-              +{searchResults.length - 5} more properties. Click search to view all.
-            </p>
-          )}
-        </div>
-      )}
-
       {/* Popular Searches */}
-      {areas.length > 1 && !showResults && (
+      {areas.length > 1 && (
         <div className="flex flex-wrap items-center justify-center gap-1.5 mt-4">
           <span className="text-xs text-gray-400 font-medium">Popular:</span>
-          {areas.slice(1, 6).map((area) => (
+          {areas.slice(1, 7).map((area) => (
             <button
               key={area.value}
               type="button"
               onClick={() => {
                 setSelectedArea(area.value);
+                // Auto-search when popular area is clicked
                 setTimeout(() => {
                   handleSearch();
                 }, 100);

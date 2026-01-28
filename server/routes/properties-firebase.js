@@ -357,12 +357,20 @@ router.get('/', async (req, res) => {
     });
 
     res.json({
+      success: true,
       properties: formattedProperties,
       pagination: {
         total: properties.length,
         limit: limitNum,
         offset: offsetNum,
         hasMore: (offsetNum + limitNum) < properties.length
+      },
+      filters: {
+        transactionType: transactionType || null,
+        type: type || null,
+        area: area || null,
+        city: city || null,
+        budget: budget || null
       }
     });
   } catch (error) {
