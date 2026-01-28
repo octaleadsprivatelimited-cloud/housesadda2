@@ -273,17 +273,48 @@ const PropertyForm = () => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    if (!formData.title || !formData.area || !formData.price) {
+    // Validate required fields
+    if (!formData.title || !formData.title.trim()) {
       toast({
         title: "Validation Error",
-        description: "Please fill in all required fields.",
+        description: "Property title is required.",
         variant: "destructive",
       });
       setIsSubmitting(false);
       return;
     }
 
-    // Validate images
+    if (!formData.area || formData.area === 'All Areas' || !formData.area.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please select a valid area/location.",
+        variant: "destructive",
+      });
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!formData.price || isNaN(parseFloat(formData.price)) || parseFloat(formData.price) <= 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a valid price.",
+        variant: "destructive",
+      });
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!formData.type || formData.type === 'All Types' || !formData.type.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please select a valid property type.",
+        variant: "destructive",
+      });
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Validate images (optional but warn)
     if (images.length === 0) {
       const confirm = window.confirm('No images selected. Do you want to continue without images?');
       if (!confirm) {
@@ -294,51 +325,64 @@ const PropertyForm = () => {
 
     try {
       // Compress description content
-      const compressedDescription = compressContent(formData.description);
+      const compressedDescription = compressContent(formData.description || '');
 
       const propertyData = {
-        title: formData.title,
+        title: formData.title.trim(),
         type: formData.type,
-        city: formData.city,
+        city: formData.city || 'Hyderabad',
         area: formData.area,
         price: parseFloat(formData.price),
         bedrooms: formData.bedrooms ? parseInt(formData.bedrooms) : 0,
         bathrooms: formData.bathrooms ? parseInt(formData.bathrooms) : 0,
         sqft: formData.sqft ? parseInt(formData.sqft) : 0,
         description: compressedDescription,
-        transactionType: formData.transactionType,
-        images: images.filter(img => img && img.trim() !== ''), // Filter out empty images
-        isFeatured: formData.isFeatured,
-        isActive: formData.isActive,
-        amenities: formData.amenities,
-        highlights: formData.highlights,
-        brochureUrl: formData.brochureUrl,
-        mapUrl: formData.mapUrl,
-        videoUrl: formData.videoUrl,
+        transactionType: formData.transactionType || 'Sale',
+        images: images.filter(img => img && typeof img === 'string' && img.trim() !== ''), // Filter out empty images
+        isFeatured: formData.isFeatured === true,
+        isActive: formData.isActive !== false,
+        amenities: Array.isArray(formData.amenities) ? formData.amenities : [],
+        highlights: Array.isArray(formData.highlights) ? formData.highlights : [],
+        brochureUrl: formData.brochureUrl || '',
+        mapUrl: formData.mapUrl || '',
+        videoUrl: formData.videoUrl || '',
       };
 
-      console.log(`📤 Submitting property with ${propertyData.images.length} images`);
+      console.log('📤 Submitting property:', {
+        title: propertyData.title,
+        type: propertyData.type,
+        area: propertyData.area,
+        city: propertyData.city,
+        transactionType: propertyData.transactionType,
+        imagesCount: propertyData.images.length
+      });
 
       if (isEditMode && id) {
-        await propertiesAPI.update(id, propertyData);
+        const response = await propertiesAPI.update(id, propertyData);
+        console.log('✅ Property updated:', response);
         toast({
           title: "Property Updated!",
-          description: "Your property has been successfully updated with images.",
+          description: "Your property has been successfully updated.",
         });
       } else {
-        await propertiesAPI.create(propertyData);
+        const response = await propertiesAPI.create(propertyData);
+        console.log('✅ Property created:', response);
         toast({
           title: "Property Added!",
-          description: "Your property has been successfully added with images.",
+          description: `Property ${response.id || 'created'} has been successfully added.`,
         });
       }
 
-      navigate('/admin/properties');
+      // Navigate after a short delay to show success message
+      setTimeout(() => {
+        navigate('/admin/properties');
+      }, 1000);
     } catch (error: any) {
-      console.error('Submit error:', error);
+      console.error('❌ Submit error:', error);
+      const errorMessage = error?.message || error?.error || "Failed to save property. Please check the console for details.";
       toast({
         title: "Error",
-        description: error.message || "Failed to save property",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

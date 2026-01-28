@@ -663,21 +663,85 @@ router.post('/', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Title, type, area, and price are required' });
     }
 
-    // Get location_id and type_id
-    const locationSnapshot = await db.collection('locations')
-      .where('name', '==', area)
-      .where('city', '==', city || 'Hyderabad')
-      .limit(1)
-      .get();
-    
-    const typeSnapshot = await db.collection('property_types')
-      .where('name', '==', type)
-      .limit(1)
-      .get();
+    console.log('📝 Creating property with data:', {
+      title,
+      type,
+      city: city || 'Hyderabad',
+      area,
+      transactionType: transactionType || 'Sale'
+    });
 
-    if (locationSnapshot.empty || typeSnapshot.empty) {
-      return res.status(400).json({ error: 'Invalid location or type' });
+    // Get location_id and type_id with better error handling
+    let locationId = null;
+    let typeId = null;
+
+    // Location lookup with case-insensitive fallback
+    if (area) {
+      let locationQuery = db.collection('locations')
+        .where('name', '==', area);
+      if (city) {
+        locationQuery = locationQuery.where('city', '==', city || 'Hyderabad');
+      }
+      const locationSnapshot = await locationQuery.limit(1).get();
+      
+      if (!locationSnapshot.empty) {
+        locationId = locationSnapshot.docs[0].id;
+      } else {
+        // Case-insensitive fallback
+        const allLocations = await db.collection('locations').get();
+        const matched = allLocations.docs.find(doc => {
+          const locData = doc.data();
+          const nameMatch = locData.name && locData.name.toLowerCase() === area.toLowerCase();
+          const cityMatch = !city || locData.city === (city || 'Hyderabad');
+          return nameMatch && cityMatch;
+        });
+        if (matched) {
+          locationId = matched.id;
+        } else {
+          console.error(`❌ Location not found: ${area}, ${city || 'Hyderabad'}`);
+          return res.status(400).json({ 
+            error: 'Invalid location', 
+            message: `Location "${area}" not found. Please create this location first in the Locations section.`,
+            details: { area, city: city || 'Hyderabad' }
+          });
+        }
+      }
+    } else {
+      return res.status(400).json({ error: 'Area is required' });
     }
+    
+    // Type lookup with case-insensitive fallback
+    if (type) {
+      const typeSnapshot = await db.collection('property_types')
+        .where('name', '==', type)
+        .limit(1)
+        .get();
+      
+      if (!typeSnapshot.empty) {
+        typeId = typeSnapshot.docs[0].id;
+      } else {
+        // Case-insensitive fallback
+        const allTypes = await db.collection('property_types').get();
+        const matched = allTypes.docs.find(doc => {
+          const typeData = doc.data();
+          return typeData.name && typeData.name.toLowerCase() === type.toLowerCase();
+        });
+        if (matched) {
+          typeId = matched.id;
+        } else {
+          console.error(`❌ Property type not found: ${type}`);
+          return res.status(400).json({ 
+            error: 'Invalid property type', 
+            message: `Property type "${type}" not found. Please create this type first in the Types section.`,
+            details: { type }
+          });
+        }
+      }
+    } else {
+      return res.status(400).json({ error: 'Property type is required' });
+    }
+
+    console.log(`✅ Found location_id: ${locationId}, type_id: ${typeId}`);
 
     const locationId = locationSnapshot.docs[0].id;
     const typeId = typeSnapshot.docs[0].id;
