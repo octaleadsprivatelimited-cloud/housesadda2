@@ -743,8 +743,6 @@ router.post('/', authenticateToken, async (req, res) => {
 
     console.log(`✅ Found location_id: ${locationId}, type_id: ${typeId}`);
 
-    const locationId = locationSnapshot.docs[0].id;
-    const typeId = typeSnapshot.docs[0].id;
     const finalTransactionType = transactionType || 'Sale';
 
     // Generate property ID: R#001 for Rent, B#001 for Buy/Sale
@@ -790,8 +788,21 @@ router.post('/', authenticateToken, async (req, res) => {
 
     res.json({ success: true, id: propertyId });
   } catch (error) {
-    console.error('Create property error:', error);
-    res.status(500).json({ error: 'Internal server error', message: error.message });
+    console.error('❌ Create property error:', error);
+    console.error('   Message:', error.message);
+    console.error('   Stack:', error.stack);
+    console.error('   Request body keys:', Object.keys(req.body || {}));
+    
+    // Return detailed error for debugging
+    res.status(500).json({ 
+      success: false,
+      error: 'Internal server error', 
+      message: error.message || 'An unexpected error occurred while creating the property',
+      details: process.env.NODE_ENV === 'development' ? {
+        stack: error.stack,
+        name: error.name
+      } : undefined
+    });
   }
 });
 

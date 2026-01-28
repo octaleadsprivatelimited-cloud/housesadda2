@@ -53,21 +53,50 @@ if (process.env.NODE_ENV === 'development') {
   });
 }
 
-// Database initialization
+// Database initialization - ensure Firebase is initialized before database operations
 let dbInitialized = false;
+let dbInitPromise = null;
+
 async function ensureDatabaseInitialized() {
-  if (dbInitialized || !admin.apps.length) {
-    return dbInitialized;
+  // If already initialized, return immediately
+  if (dbInitialized && admin.apps.length > 0) {
+    return true;
   }
 
-  try {
-    await initDatabase();
-    dbInitialized = true;
-    return true;
-  } catch (error) {
-    console.warn('⚠️  Database initialization failed:', error.message);
-    return false;
+  // If initialization is in progress, wait for it
+  if (dbInitPromise) {
+    return dbInitPromise;
   }
+
+  // Start initialization
+  dbInitPromise = (async () => {
+    try {
+      // Import initializeFirebase dynamically to avoid circular dependencies
+      const { initializeFirebase } = await import('./db-firebase.js');
+      
+      // Ensure Firebase Admin SDK is initialized
+      if (!admin.apps.length) {
+        const initResult = initializeFirebase();
+        if (!initResult) {
+          console.error('❌ Firebase Admin SDK initialization failed');
+          return false;
+        }
+      }
+
+      // Initialize database schema
+      await initDatabase();
+      dbInitialized = true;
+      console.log('✅ Database initialized successfully');
+      return true;
+    } catch (error) {
+      console.error('❌ Database initialization error:', error);
+      console.error('   Stack:', error.stack);
+      dbInitialized = false;
+      return false;
+    }
+  })();
+
+  return dbInitPromise;
 }
 
 // Routes
